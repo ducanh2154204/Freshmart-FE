@@ -15,7 +15,7 @@ export const GroupBuyingBanner: React.FC = () => {
           </p>
           <Button
             size="lg"
-            className="bg-white text-green-500 hover:bg-gray-600 font-semibold"
+            className="bg-white text-green-600 hover:bg-gray-100 font-semibold"
           >
             Khám phá ngay
           </Button>
