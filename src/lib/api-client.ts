@@ -1,11 +1,13 @@
 import type { RequestConfig, ApiError } from '@/types/api'
-import type { BaseResponse } from '@/types'
+
+const DEFAULT_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'https://fresh-mart-be.onrender.com'
 
 class ApiClient {
   private baseURL: string
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL || process.env.NEXT_PUBLIC_API_URL || ''
+    this.baseURL = baseURL || DEFAULT_BASE_URL
   }
 
   private async request<T>(
@@ -28,7 +30,22 @@ class ApiClient {
     }
 
     // Merge headers
-    const mergedHeaders = { ...defaultHeaders, ...headers }
+    const mergedHeaders: Record<string, string> = { ...defaultHeaders, ...headers }
+
+    // Auto-attach access token (client-side only)
+    if (typeof window !== 'undefined') {
+      try {
+        const token = window.localStorage.getItem('accessToken')
+        const hasAuthHeader = Object.keys(mergedHeaders).some(
+          k => k.toLowerCase() === 'authorization'
+        )
+        if (token && !hasAuthHeader) {
+          mergedHeaders.Authorization = `Bearer ${token}`
+        }
+      } catch {
+        // ignore localStorage errors
+      }
+    }
 
     // Build fetch options
     const fetchOptions: RequestInit = {
