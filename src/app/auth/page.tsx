@@ -33,12 +33,11 @@ export default function AuthPage() {
           <div className="w-full lg:w-1/2 max-w-lg">
             <div className="text-center lg:text-left">
               <div className="flex items-center justify-center lg:justify-start mb-6">
-                <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-3xl">F</span>
-                </div>
-                <span className="text-4xl font-bold text-gray-900 ml-4">
-                  FreshMart
-                </span>
+                <img
+                  src="/images/logoFM.jpg"
+                  alt="FreshMart"
+                  className="h-20 w-auto object-contain rounded-2xl shadow-lg"
+                />
               </div>
 
               <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">

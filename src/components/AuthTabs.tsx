@@ -1,32 +1,123 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { authService } from '@/services/auth.service'
+import type { ApiError } from '@/types/api'
 
 type TabType = 'login' | 'register'
 
 export const AuthTabs: React.FC = () => {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('login')
   const [loginData, setLoginData] = useState({ email: '', password: '' })
   const [registerData, setRegisterData] = useState({
     fullName: '',
     email: '',
-    phone: '',
     password: '',
     confirmPassword: '',
   })
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [registerLoading, setRegisterLoading] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [registerError, setRegisterError] = useState<string | null>(null)
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log('Login:', loginData)
-    // Add login logic here
+  const extractToken = (response: unknown): string | null => {
+    const r = response as any
+    return (
+      r?.data?.accessToken ??
+      r?.data?.token ??
+      r?.accessToken ??
+      r?.token ??
+      null
+    )
   }
 
-  const handleRegister = (e: React.FormEvent) => {
+  const extractUser = (response: unknown): { fullName?: string; email?: string } | null => {
+    const r = response as any
+    const user =
+      r?.data?.user ??
+      r?.data?.account ??
+      r?.user ??
+      r?.account ??
+      null
+
+    if (!user || typeof user !== 'object') return null
+    return {
+      fullName:
+        (user.fullName as string | undefined) ||
+        (user.name as string | undefined),
+      email: user.email as string | undefined,
+    }
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Register:', registerData)
-    // Add register logic here
+    setLoginError(null)
+    setLoginLoading(true)
+
+    try {
+      const response = await authService.login(loginData)
+      const token = extractToken(response)
+      const user = extractUser(response)
+      if (!token) {
+        setLoginError('Đăng nhập thành công nhưng không nhận được accessToken.')
+        return
+      }
+
+      window.localStorage.setItem('accessToken', token)
+      if (user) {
+        window.localStorage.setItem('user', JSON.stringify(user))
+      }
+      window.dispatchEvent(new Event('auth:changed'))
+      router.push('/')
+    } catch (error) {
+      const apiError = error as ApiError
+      setLoginError(
+        apiError?.message || 'Đăng nhập thất bại. Vui lòng thử lại.'
+      )
+    } finally {
+      setLoginLoading(false)
+    }
+  }
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setRegisterError(null)
+
+    if (registerData.password !== registerData.confirmPassword) {
+      setRegisterError('Mật khẩu xác nhận không khớp.')
+      return
+    }
+
+    setRegisterLoading(true)
+
+    try {
+      const response = await authService.register(registerData)
+      const token = extractToken(response)
+      const user = extractUser(response)
+      if (token) {
+        window.localStorage.setItem('accessToken', token)
+        if (user) {
+          window.localStorage.setItem('user', JSON.stringify(user))
+        }
+        window.dispatchEvent(new Event('auth:changed'))
+        router.push('/')
+        return
+      }
+
+      // Nếu BE không trả token khi đăng ký, chuyển qua tab login
+      setActiveTab('login')
+    } catch (error) {
+      const apiError = error as ApiError
+      setRegisterError(
+        apiError?.message || 'Đăng ký thất bại. Vui lòng thử lại.'
+      )
+    } finally {
+      setRegisterLoading(false)
+    }
   }
 
   return (
@@ -101,8 +192,13 @@ export const AuthTabs: React.FC = () => {
               }
               required
               className="w-full"
+              showPasswordToggle
             />
           </div>
+
+          {loginError && (
+            <p className="text-sm text-red-600">{loginError}</p>
+          )}
 
           <div className="flex items-center justify-between text-sm">
             <label className="flex items-center">
@@ -123,9 +219,10 @@ export const AuthTabs: React.FC = () => {
           <Button
             type="submit"
             variant="primary"
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3"
+            disabled={loginLoading}
+            className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3"
           >
-            Đăng nhập
+            {loginLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </Button>
 
           <div className="mt-6 text-center text-sm text-gray-600">
@@ -186,26 +283,6 @@ export const AuthTabs: React.FC = () => {
 
           <div>
             <label
-              htmlFor="register-phone"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Số điện thoại
-            </label>
-            <Input
-              id="register-phone"
-              type="tel"
-              placeholder="0987654321"
-              value={registerData.phone}
-              onChange={e =>
-                setRegisterData({ ...registerData, phone: e.target.value })
-              }
-              required
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <label
               htmlFor="register-password"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
@@ -221,8 +298,13 @@ export const AuthTabs: React.FC = () => {
               }
               required
               className="w-full"
+              showPasswordToggle
             />
           </div>
+
+          {registerError && (
+            <p className="text-sm text-red-600">{registerError}</p>
+          )}
 
           <div>
             <label
@@ -244,6 +326,7 @@ export const AuthTabs: React.FC = () => {
               }
               required
               className="w-full"
+              showPasswordToggle
             />
           </div>
 
@@ -274,9 +357,10 @@ export const AuthTabs: React.FC = () => {
           <Button
             type="submit"
             variant="primary"
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3"
+            disabled={registerLoading}
+            className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3"
           >
-            Đăng ký
+            {registerLoading ? 'Đang đăng ký...' : 'Đăng ký'}
           </Button>
 
           <div className="mt-6 text-center text-sm text-gray-600">

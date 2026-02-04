@@ -9,9 +9,11 @@ export const Footer: React.FC = () => {
           {/* Company Info */}
           <div>
             <h3 className="text-gray-900 font-bold text-lg mb-4 flex items-center">
-              <div className="w-8 h-8 bg-green-500 rounded flex items-center justify-center mr-2">
-                <span className="text-black font-bold">F</span>
-              </div>
+              <img
+                src="/images/logoFM.jpg"
+                alt="FreshMart"
+                className="h-10 w-auto object-contain mr-2"
+              />
               FreshMart
             </h3>
             <p className="text-sm text-gray-600 mb-4">
