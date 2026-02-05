@@ -1,7 +1,9 @@
 import React from 'react'
+import Link from 'next/link'
 import { Button } from './ui/Button'
 
 interface GroupBuyingCardProps {
+  id?: number | string
   image: string
   title: string
   currentPrice: number
@@ -14,6 +16,7 @@ interface GroupBuyingCardProps {
 }
 
 export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
+  id,
   image,
   title,
   currentPrice,
@@ -35,8 +38,8 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
   )
 
   if (size === 'small') {
-    return (
-      <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden group cursor-pointer">
+    const cardContent = (
+      <>
         <div className="relative h-32 bg-gray-100 overflow-hidden">
           <img
             src={image}
@@ -64,12 +67,25 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
             Mua ngay
           </Button>
         </div>
+      </>
+    )
+
+    return id ? (
+      <Link
+        href={`/group-buying/${id}`}
+        className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden group cursor-pointer block"
+      >
+        {cardContent}
+      </Link>
+    ) : (
+      <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden group cursor-pointer">
+        {cardContent}
       </div>
     )
   }
 
-  return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden">
+  const cardContent = (
+    <>
       {/* Image Container */}
       <div className="relative h-56 bg-gray-100 overflow-hidden group">
         <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full z-10">
@@ -161,7 +177,7 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
           variant="primary"
           className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold"
         >
-          Đặt hàng
+          Xem chi tiết
         </Button>
 
         {participants > 0 && (
@@ -170,6 +186,19 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
           </p>
         )}
       </div>
+    </>
+  )
+
+  return id ? (
+    <Link
+      href={`/group-buying/${id}`}
+      className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden block"
+    >
+      {cardContent}
+    </Link>
+  ) : (
+    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden">
+      {cardContent}
     </div>
   )
 }

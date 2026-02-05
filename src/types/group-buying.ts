@@ -1,0 +1,55 @@
+// Group Buying types
+export interface GroupBuying {
+  id: number | string
+  productId: number | string
+  product?: {
+    id: number | string
+    name: string
+    image: string
+    price: number
+    originalPrice?: number
+  }
+  title?: string
+  image?: string
+  currentPrice: number
+  originalPrice: number
+  quantity: number
+  targetQuantity?: number
+  currentQuantity?: number
+  maxParticipants?: number
+  currentParticipants?: number
+  participants?: number
+  status?: 'active' | 'completed' | 'cancelled' | 'expired'
+  startTime?: string
+  endTime?: string
+  timeLeft?: string
+  deliveryInfo?: string
+  deliveryAddress?: string
+  recipientName?: string
+  rating?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateGroupBuyingPayload {
+  productId: number | string
+  discountPrice: number
+  targetQuantity: number
+  endTime: string // ISO 8601 format
+  deliveryAddress: string // Required
+}
+
+export interface GroupBuyingListParams {
+  page?: number
+  limit?: number
+  status?: 'active' | 'completed' | 'cancelled' | 'expired'
+  productId?: number | string
+}
+
+export interface GroupBuyingListResponse {
+  data: GroupBuying[]
+  total?: number
+  page?: number
+  limit?: number
+  totalPages?: number
+}

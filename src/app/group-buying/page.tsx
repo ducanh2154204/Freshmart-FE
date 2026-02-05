@@ -1,68 +1,113 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { GroupBuyingCard } from '@/components/GroupBuyingCard'
+import { groupBuyingService } from '@/services/group-buying.service'
+import { productService } from '@/services/product.service'
+import type { GroupBuying } from '@/types/group-buying'
+import type { Product } from '@/types/product'
 import Link from 'next/link'
 
 export default function GroupBuyingPage() {
-  const ongoingDeals = [
-    {
-      image:
-        'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
-      title: 'Combo 5kg gạo ST25 cao cấp',
-      currentPrice: 164000,
-      originalPrice: 240000,
-      rating: 5,
-      participants: 45,
-      timeLeft: 'Còn 2 ngày 15 giờ',
-      deliveryInfo: 'Giao hàng miễn phí trong nội thành TP.HCM, Hà Nội',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80',
-      title: 'Hộp sữa tươi tiệt trùng Vinamilk 100% (1 lít x 12 hộp)',
-      currentPrice: 360000,
-      originalPrice: 420000,
-      rating: 5,
-      participants: 89,
-      timeLeft: 'Còn 1 ngày 8 giờ',
-      deliveryInfo: 'Miễn phí vận chuyển toàn quốc cho đơn hàng từ 300.000đ',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&q=80',
-      title: 'Combo trái cây tươi ngon (Nho + Kiwi + Xoài)',
-      currentPrice: 245000,
-      originalPrice: 350000,
-      rating: 5,
-      participants: 62,
-      timeLeft: 'Còn 3 ngày 5 giờ',
-      deliveryInfo: 'Giao hàng nhanh trong 24h tại khu vực nội thành',
-    },
-  ]
+  const [ongoingDeals, setOngoingDeals] = useState<GroupBuying[]>([])
+  const [groupBuyingProducts, setGroupBuyingProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const groupBuyingProducts = [
-    {
-      image:
-        'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
-      title: 'Thùng 30 trứng gà omega 3',
-      currentPrice: 120000,
-      originalPrice: 180000,
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?w=400&q=80',
-      title: 'Combo rau củ quả hữu cơ',
-      currentPrice: 180000,
-      originalPrice: 250000,
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&q=80',
-      title: 'Thùng thịt heo sạch 5kg',
-      currentPrice: 450000,
-      originalPrice: 580000,
-    },
-  ]
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+
+      // Fetch active group buyings (separate try-catch để không ảnh hưởng đến products)
+      // TODO: Uncomment khi BE đã có endpoint group buying
+      try {
+        const dealsResponse = await groupBuyingService.getActiveGroupBuyings({
+          limit: 10,
+        })
+        const dealsData = dealsResponse as any
+
+        // Debug log để xem response structure
+        console.log('Group buying response:', dealsData)
+
+        const deals =
+          dealsData?.data?.data ?? dealsData?.data ?? dealsData ?? []
+
+        // Kiểm tra nếu deals là array
+        if (Array.isArray(deals) && deals.length > 0) {
+          const mappedDeals = deals.map((deal: GroupBuying) => ({
+            id: deal.id,
+            productId: deal.productId || deal.product?.id || 0,
+            quantity: deal.quantity || deal.targetQuantity || 1,
+            image:
+              deal.image ||
+              deal.product?.image ||
+              'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
+            title: deal.title || deal.product?.name || 'Sản phẩm',
+            currentPrice: deal.currentPrice || deal.discountPrice || 0,
+            originalPrice: deal.originalPrice || deal.product?.price || 0,
+            rating: deal.rating || 5,
+            participants: deal.participants || deal.currentParticipants || 0,
+            timeLeft: deal.timeLeft,
+            deliveryInfo: deal.deliveryInfo,
+          }))
+
+          setOngoingDeals(mappedDeals)
+        } else {
+          console.log('No group buying deals found or invalid format')
+        }
+      } catch (err: any) {
+        // Log chi tiết hơn để debug
+        const errorInfo = {
+          message: err?.message,
+          status: err?.status,
+          code: err?.code,
+          name: err?.name,
+          stack: err?.stack,
+          toString: String(err),
+          keys: err ? Object.keys(err) : [],
+        }
+        console.warn('Group buying API not available or error:', errorInfo)
+        // Giữ default deals nếu API fail - không throw error để không block UI
+      }
+
+      // Fetch products for group buying (separate try-catch)
+      try {
+        const productsResponse = await productService.getProducts({
+          limit: 6,
+        })
+        const productsData = productsResponse as any
+        const products =
+          productsData?.data?.data ?? productsData?.data ?? productsData ?? []
+
+        if (Array.isArray(products) && products.length > 0) {
+          const mappedProducts = products.slice(0, 6).map((p: Product) => ({
+            id: p.id,
+            image: p.image || '/images/placeholder.jpg',
+            title: p.name || p.title || '',
+            currentPrice: p.price,
+            originalPrice: p.originalPrice || p.price,
+          }))
+
+          setGroupBuyingProducts(mappedProducts)
+        }
+      } catch (err: any) {
+        console.error('Error fetching products:', {
+          message: err?.message,
+          status: err?.status,
+          error: err,
+        })
+        // Giữ default products nếu API fail
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const displayDeals = ongoingDeals
+  const displayProducts = groupBuyingProducts
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -207,11 +252,22 @@ export default function GroupBuyingPage() {
               Tạo nhóm mới
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {ongoingDeals.map((deal, index) => (
-              <GroupBuyingCard key={index} {...deal} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-lg shadow-md h-96 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {displayDeals.map((deal, index) => (
+                <GroupBuyingCard key={deal.id || `deal-${index}`} {...deal} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -221,11 +277,26 @@ export default function GroupBuyingPage() {
           <h2 className="text-gray-800 text-2xl font-bold mb-6">
             Sản phẩm mua chung
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {groupBuyingProducts.map((product, index) => (
-              <GroupBuyingCard key={index} {...product} size="small" />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-lg shadow-md h-48 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {displayProducts.map((product, index) => (
+                <GroupBuyingCard
+                  key={product.id || `product-${index}`}
+                  {...product}
+                  size="small"
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

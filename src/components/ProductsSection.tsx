@@ -1,6 +1,11 @@
-import React from 'react'
+'use client'
+
+import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Button } from './ui/Button'
+import { productService } from '@/services/product.service'
+import type { Product } from '@/types/product'
+import type { BaseResponse } from '@/types'
 
 interface ProductCardProps {
   image: string
@@ -110,61 +115,83 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }
 
 export const ProductsSection: React.FC = () => {
-  const products = [
-    {
-      image:
-        'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
-      title: 'Cà chua bi hữu cơ',
-      brand: 'Nông trại xanh',
-      price: 35000,
-      originalPrice: 54000,
-      rating: 5,
-      discount: '-35%',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&q=80',
-      title: 'Thịt ba chỉ tươi',
-      brand: 'Thịt sạch Việt',
-      price: 120000,
-      originalPrice: 140000,
-      rating: 5,
-      discount: '-14%',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=400&q=80',
-      title: 'Tôm sú tươi sống',
-      brand: 'Hải sản Vũng Tàu',
-      price: 280000,
-      rating: 5,
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80',
-      title: 'Sữa tươi không đường',
-      brand: 'Vinamilk',
-      price: 32000,
-      rating: 5,
-    },
-    {
-      image: '/images/watermelon.jpg.png',
-      title: 'Dưa hấu ruột đỏ',
-      brand: 'Trái cây Đà Lạt',
-      price: 25000,
-      originalPrice: 45000,
-      rating: 5,
-      discount: '-44%',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
-      title: 'Gạo ST25 cao cấp',
-      brand: 'Gạo Việt',
-      price: 220000,
-      rating: 5,
-    },
-  ]
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true)
+        const response = await productService.getProducts({
+          limit: 6,
+          sortBy: 'rating',
+          order: 'desc',
+        })
+
+        const responseData = response as any
+        const productsList =
+          responseData?.data?.data ?? responseData?.data ?? responseData ?? []
+
+        // Map API response to component format
+        const mappedProducts = productsList.map((p: Product) => ({
+          id: p.id,
+          image: p.image || '/images/placeholder.jpg',
+          title: p.name || p.title || '',
+          brand: p.brand,
+          price: p.price,
+          originalPrice: p.originalPrice,
+          rating: p.rating || 5,
+          discount:
+            p.originalPrice && p.price < p.originalPrice
+              ? `-${Math.round(
+                  ((p.originalPrice - p.price) / p.originalPrice) * 100
+                )}%`
+              : undefined,
+        }))
+
+        setProducts(mappedProducts)
+      } catch (err) {
+        console.error('Error fetching products:', err)
+        setError('Không thể tải sản phẩm')
+        // Fallback to empty array or keep previous data
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [])
+
+  if (loading) {
+    return (
+      <section className="py-12 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-black">Sản phẩm nổi bật</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-lg shadow-md h-64 animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (error && products.length === 0) {
+    return (
+      <section className="py-12 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-gray-600">{error}</div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-12 bg-gray-50">
@@ -178,11 +205,15 @@ export const ProductsSection: React.FC = () => {
             Xem tất cả →
           </a>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {products.map((product, index) => (
-            <ProductCard key={index} {...product} />
-          ))}
-        </div>
+        {products.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {products.map(product => (
+              <ProductCard key={product.id} {...product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-gray-600">Chưa có sản phẩm nào</div>
+        )}
       </div>
     </section>
   )

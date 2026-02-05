@@ -1,0 +1,433 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
+import { Header } from '@/components/Header'
+import { Footer } from '@/components/Footer'
+import { groupBuyingService } from '@/services/group-buying.service'
+import type { GroupBuying } from '@/types'
+import { Button } from '@/components/ui'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+
+// Helper to calculate time remaining
+const calculateTimeRemaining = (endTime: string) => {
+  const now = new Date().getTime()
+  const end = new Date(endTime).getTime()
+  const diff = end - now
+
+  if (diff <= 0) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true }
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+  return { days, hours, minutes, seconds, expired: false }
+}
+
+export default function GroupBuyingDetailPage() {
+  const router = useRouter()
+  const params = useParams()
+  const groupBuyId = params.id as string
+
+  const [groupBuy, setGroupBuy] = useState<GroupBuying | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isJoining, setIsJoining] = useState(false)
+  const [quantity, setQuantity] = useState(1)
+  const [timeRemaining, setTimeRemaining] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    expired: false,
+  })
+
+  useEffect(() => {
+    fetchGroupBuyDetails()
+  }, [groupBuyId])
+
+  // Real-time countdown timer
+  useEffect(() => {
+    if (!groupBuy?.endTime) return
+
+    const updateTimer = () => {
+      setTimeRemaining(calculateTimeRemaining(groupBuy.endTime!))
+    }
+
+    updateTimer()
+    const interval = setInterval(updateTimer, 1000)
+
+    return () => clearInterval(interval)
+  }, [groupBuy?.endTime])
+
+  const fetchGroupBuyDetails = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Dùng API GET /group-buys/{id}
+      const response = await groupBuyingService.getGroupBuyingById(groupBuyId)
+
+      // Response có thể là { data: {...} } hoặc direct object
+      let groupBuyData: GroupBuying | null = null
+
+      if (response && typeof response === 'object' && 'data' in response) {
+        groupBuyData = (response as any)?.data?.data || (response as any)?.data
+      } else {
+        groupBuyData = response as GroupBuying
+      }
+
+      if (groupBuyData && groupBuyData.id) {
+        setGroupBuy(groupBuyData)
+      } else {
+        throw new Error(`Không tìm thấy nhóm mua chung với ID ${groupBuyId}`)
+      }
+    } catch (err: any) {
+      console.error('Error fetching group buy:', err)
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tải thông tin nhóm mua chung'
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleJoinGroup = async () => {
+    try {
+      setIsJoining(true)
+      await groupBuyingService.joinGroupBuying(groupBuyId)
+      // Refresh data after joining
+      await fetchGroupBuyDetails()
+      alert('Tham gia nhóm thành công!')
+    } catch (err: any) {
+      alert(err.message || 'Không thể tham gia nhóm')
+    } finally {
+      setIsJoining(false)
+    }
+  }
+
+  const handleCheckout = () => {
+    router.push(`/group-buying/${groupBuyId}/checkout`)
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <div className="flex items-center justify-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+        <Footer />
+      </>
+    )
+  }
+
+  if (error || !groupBuy) {
+    return (
+      <>
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">
+              {error || 'Không tìm thấy nhóm mua chung'}
+            </p>
+            <Button onClick={() => router.push('/group-buying')}>
+              Quay lại danh sách
+            </Button>
+          </div>
+        </div>
+        <Footer />
+      </>
+    )
+  }
+
+  // Get prices with fallbacks
+  const currentPrice =
+    groupBuy.currentPrice ||
+    (groupBuy as any).discountPrice ||
+    groupBuy.product?.price ||
+    0
+  const originalPrice =
+    groupBuy.originalPrice ||
+    groupBuy.product?.originalPrice ||
+    groupBuy.product?.price ||
+    currentPrice
+
+  const discount = originalPrice - currentPrice
+  const discountPercent =
+    originalPrice > 0 ? Math.round((discount / originalPrice) * 100) : 0
+
+  // Tính số người: backend đã tính sẵn người tạo trong currentQuantity
+  const targetPeople = groupBuy.targetQuantity || groupBuy.maxParticipants || 10
+  const currentPeople =
+    groupBuy.currentQuantity ||
+    groupBuy.currentParticipants ||
+    groupBuy.participants ||
+    0
+  const progress = (currentPeople / targetPeople) * 100
+
+  // Calculate costs
+  const itemPrice = currentPrice * quantity
+  const shippingFee = 20000
+  const totalCost = itemPrice + shippingFee
+
+  // Generate share URL and QR code
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`
+
+  // Validate and get safe image URL
+  const getImageUrl = () => {
+    const image = groupBuy.product?.image || groupBuy.image
+    if (!image) return '/images/placeholder.png'
+
+    // Check if it's a valid absolute URL
+    try {
+      new URL(image)
+      return image
+    } catch {
+      // If not a valid URL, check if it's a local path
+      if (image.startsWith('/')) return image
+      // Otherwise use placeholder
+      return '/images/placeholder.png'
+    }
+  }
+
+  return (
+    <>
+      <Header />
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4 max-w-6xl">
+          {/* Header */}
+          <div className="mb-6">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <span className="mr-2">←</span>
+              Quay lại
+            </button>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Side - Image */}
+              <div className="space-y-4">
+                <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <Image
+                    src={getImageUrl()}
+                    alt={groupBuy.product?.name || groupBuy.title || 'Product'}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+
+                {/* Share QR Code */}
+                <div className="bg-white border-2 border-green-500 rounded-lg p-4">
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">
+                      Chia nhóm mua chung
+                    </p>
+                    <div className="flex justify-center mb-2">
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR Code"
+                        className="w-40 h-40 border-2 border-gray-200 rounded"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Quét mã để tham gia nhóm
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side - Details */}
+              <div className="space-y-4">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {groupBuy.product?.name || groupBuy.title}
+                </h1>
+
+                {/* Prices */}
+                <div>
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-sm text-gray-500">Giá mua lẻ</span>
+                    <span className="text-xl text-gray-400 line-through">
+                      {originalPrice.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm text-gray-700 font-medium">
+                      Giá mua nhóm
+                    </span>
+                    <span className="text-3xl font-bold text-green-600">
+                      {currentPrice.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="mt-2 inline-block bg-green-100 text-green-700 text-sm px-3 py-1 rounded-full">
+                      Tiết kiệm {discountPercent}% (
+                      {discount.toLocaleString('vi-VN')}đ)
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress */}
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      Tiến trình nhóm
+                    </span>
+                    <span className="text-sm font-bold text-orange-600">
+                      {currentPeople}/{targetPeople}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-orange-500 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(progress, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Cần thêm {Math.max(0, targetPeople - currentPeople)} người
+                    để đạt mục tiêu
+                  </p>
+                </div>
+
+                {/* Countdown Timer */}
+                {groupBuy.endTime && !timeRemaining.expired ? (
+                  <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg p-4">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <svg
+                        className="w-5 h-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span className="font-semibold">Thời gian còn lại</span>
+                    </div>
+                    <div className="flex justify-center gap-4 text-center">
+                      <div>
+                        <div className="text-3xl font-bold">
+                          {String(timeRemaining.days).padStart(2, '0')}
+                        </div>
+                        <div className="text-xs opacity-90">Ngày</div>
+                      </div>
+                      <div className="text-3xl font-bold">:</div>
+                      <div>
+                        <div className="text-3xl font-bold">
+                          {String(timeRemaining.hours).padStart(2, '0')}
+                        </div>
+                        <div className="text-xs opacity-90">Giờ</div>
+                      </div>
+                      <div className="text-3xl font-bold">:</div>
+                      <div>
+                        <div className="text-3xl font-bold">
+                          {String(timeRemaining.minutes).padStart(2, '0')}
+                        </div>
+                        <div className="text-xs opacity-90">Phút</div>
+                      </div>
+                      <div className="text-3xl font-bold">:</div>
+                      <div>
+                        <div className="text-3xl font-bold">
+                          {String(timeRemaining.seconds).padStart(2, '0')}
+                        </div>
+                        <div className="text-xs opacity-90">Giây</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : groupBuy.endTime && timeRemaining.expired ? (
+                  <div className="bg-red-100 border border-red-300 text-red-700 rounded-lg p-4 text-center">
+                    <span className="font-semibold">Nhóm mua đã hết hạn</span>
+                  </div>
+                ) : null}
+
+                {/* Quantity Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Số lượng
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100 text-gray-700 font-bold text-xl"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={e =>
+                        setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                      }
+                      className="w-20 h-10 text-center border-2 border-gray-300 rounded-lg text-gray-900 font-semibold text-lg"
+                    />
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100 text-gray-700 font-bold text-xl"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cost Summary */}
+                <div className="border-2 border-gray-200 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Giá mua chung</span>
+                    <span className="font-medium">
+                      {itemPrice.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Phí vận chuyển</span>
+                    <span className="font-medium">
+                      {shippingFee.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                  <div className="border-t-2 border-gray-200 pt-2 flex justify-between items-center">
+                    <span className="font-semibold text-gray-900">
+                      Tổng cộng
+                    </span>
+                    <span className="text-2xl font-bold text-green-600">
+                      {totalCost.toLocaleString('vi-VN')}đ
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleCheckout}
+                    disabled={timeRemaining.expired}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg font-bold text-lg disabled:bg-gray-400"
+                  >
+                    Đặt Trước/Mời Nhóm Thanh Toán
+                  </Button>
+
+                  <div className="text-xs text-center text-gray-500">
+                    Bằng việc nhấn "Đặt trước", bạn đồng ý với{' '}
+                    <a href="#" className="text-green-600 hover:underline">
+                      Điều khoản sử dụng
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <Footer />
+    </>
+  )
+}
