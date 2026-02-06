@@ -208,7 +208,15 @@ export const ProductsSection: React.FC = () => {
         {products.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {products.map(product => (
-              <ProductCard key={product.id} {...product} />
+              <ProductCard
+                key={product.id}
+                image={product.image}
+                title={product.name || product.title || ''}
+                brand={product.brand}
+                price={product.price}
+                originalPrice={product.originalPrice}
+                rating={product.rating}
+              />
             ))}
           </div>
         ) : (

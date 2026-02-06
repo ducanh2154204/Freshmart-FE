@@ -40,11 +40,9 @@ export default function GroupBuyingPage() {
             productId: deal.productId || deal.product?.id || 0,
             quantity: deal.quantity || deal.targetQuantity || 1,
             image:
-              deal.image ||
-              deal.product?.image ||
-              'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
+              deal.image || deal.product?.image || '/images/placeholder.jpg',
             title: deal.title || deal.product?.name || 'Sản phẩm',
-            currentPrice: deal.currentPrice || deal.discountPrice || 0,
+            currentPrice: deal.currentPrice || 0,
             originalPrice: deal.originalPrice || deal.product?.price || 0,
             rating: deal.rating || 5,
             participants: deal.participants || deal.currentParticipants || 0,
@@ -83,8 +81,10 @@ export default function GroupBuyingPage() {
         if (Array.isArray(products) && products.length > 0) {
           const mappedProducts = products.slice(0, 6).map((p: Product) => ({
             id: p.id,
+            name: p.name || p.title || '',
             image: p.image || '/images/placeholder.jpg',
             title: p.name || p.title || '',
+            price: p.price,
             currentPrice: p.price,
             originalPrice: p.originalPrice || p.price,
           }))
@@ -310,7 +310,18 @@ export default function GroupBuyingPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               {displayDeals.map((deal, index) => (
-                <GroupBuyingCard key={deal.id || `deal-${index}`} {...deal} />
+                <GroupBuyingCard
+                  key={deal.id || `deal-${index}`}
+                  id={deal.id}
+                  image={deal.image || ''}
+                  title={deal.title || ''}
+                  currentPrice={deal.currentPrice}
+                  originalPrice={deal.originalPrice}
+                  rating={deal.rating}
+                  participants={deal.participants}
+                  timeLeft={deal.timeLeft}
+                  deliveryInfo={deal.deliveryInfo}
+                />
               ))}
             </div>
           )}
@@ -363,7 +374,11 @@ export default function GroupBuyingPage() {
               {displayProducts.map((product, index) => (
                 <GroupBuyingCard
                   key={product.id || `product-${index}`}
-                  {...product}
+                  id={product.id}
+                  image={product.image}
+                  title={product.title || product.name}
+                  currentPrice={product.price}
+                  originalPrice={product.originalPrice || product.price}
                   size="small"
                 />
               ))}
