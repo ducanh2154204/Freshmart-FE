@@ -1,10 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { productService } from '@/services/product.service'
+import { groupBuyingService } from '@/services/group-buying.service'
+import type { Product } from '@/types/product'
+import type { ApiError } from '@/types/api'
 
 export default function CreateGroupPage() {
+  const router = useRouter()
   const [quantity, setQuantity] = useState(1)
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null)
   const [purpose, setPurpose] = useState('')
@@ -12,43 +18,41 @@ export default function CreateGroupPage() {
   const [duration, setDuration] = useState('')
   const [recipientName, setRecipientName] = useState('')
   const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const products = [
-    {
-      id: 1,
-      image:
-        'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
-      title: 'Combo 5kg gạo ST25 cao cấp',
-      price: 164000,
-    },
-    {
-      id: 2,
-      image:
-        'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80',
-      title: 'Hộp sữa tươi Vinamilk',
-      price: 360000,
-    },
-    {
-      id: 3,
-      image:
-        'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&q=80',
-      title: 'Combo trái cây tươi ngon',
-      price: 245000,
-    },
-    {
-      id: 4,
-      image:
-        'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&q=80',
-      title: 'Thùng thịt heo sạch 5kg',
-      price: 450000,
-    },
-  ]
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true)
+        const response = await productService.getProducts({ limit: 20 })
+        const responseData = response as any
+        const productsList =
+          responseData?.data?.data ?? responseData?.data ?? responseData ?? []
+
+        setProducts(productsList)
+      } catch (err) {
+        console.error('Error fetching products:', err)
+        setError('Không thể tải danh sách sản phẩm')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [])
+
+  const displayProducts = products
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN').format(price) + ' đ'
   }
 
-  const selectedProductData = products.find(p => p.id === selectedProduct)
+  const selectedProductData = displayProducts.find(
+    p => p.id === selectedProduct
+  )
   const subtotal = selectedProductData
     ? selectedProductData.price * quantity
     : 0
@@ -56,9 +60,52 @@ export default function CreateGroupPage() {
   const discount = 0
   const total = subtotal + shipping - discount
 
-  const handleCreateGroup = () => {
-    // Handle create group logic
-    console.log('Creating group...')
+  const handleCreateGroup = async () => {
+    if (!selectedProduct || !recipientName || !deliveryAddress) {
+      setError('Vui lòng điền đầy đủ thông tin')
+      return
+    }
+
+    if (!maxPeople || !duration) {
+      setError('Vui lòng chọn số người và thời gian')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      setError(null)
+
+      // Calculate times
+      const now = new Date()
+      const durationHours = parseInt(duration)
+      const endTime = new Date(now.getTime() + durationHours * 60 * 60 * 1000)
+
+      // Calculate discount (giả sử giảm 10% khi mua chung)
+      const originalPrice = selectedProductData?.price || 0
+      const discountPercent = 0.1 // 10%
+      const discountPrice = Math.round(originalPrice * (1 - discountPercent))
+
+      const payload = {
+        productId: selectedProduct,
+        discountPrice: discountPrice,
+        targetQuantity: parseInt(maxPeople),
+        endTime: endTime.toISOString(),
+        deliveryAddress: deliveryAddress,
+      }
+
+      const response = await groupBuyingService.createGroupBuying(payload)
+      console.log('Group created:', response)
+
+      // Redirect to group buying page or detail page
+      router.push('/group-buying')
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(
+        apiError?.message || 'Không thể tạo nhóm mua chung. Vui lòng thử lại.'
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -107,31 +154,50 @@ export default function CreateGroupPage() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {products.map(product => (
-                  <button
-                    key={product.id}
-                    onClick={() => setSelectedProduct(product.id)}
-                    className={`border-2 rounded-lg p-3 transition-all ${
-                      selectedProduct === product.id
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-green-300'
-                    }`}
-                  >
-                    <img
-                      src={product.image}
-                      alt={product.title}
-                      className="w-full h-20 object-cover rounded mb-2"
+              {loading ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="border-2 rounded-lg p-3 h-32 animate-pulse bg-gray-100"
                     />
-                    <h3 className="text-xs font-medium text-gray-900 line-clamp-2 mb-1">
-                      {product.title}
-                    </h3>
-                    <p className="text-sm font-semibold text-green-600">
-                      {formatPrice(product.price)}
-                    </p>
-                  </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {displayProducts.map(product => (
+                    <button
+                      key={product.id}
+                      onClick={() =>
+                        setSelectedProduct(
+                          typeof product.id === 'string'
+                            ? parseInt(product.id)
+                            : product.id
+                        )
+                      }
+                      className={`border-2 rounded-lg p-3 transition-all relative ${
+                        selectedProduct === product.id
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 hover:border-green-300 bg-white'
+                      }`}
+                    >
+                      <img
+                        src={product.image || '/images/placeholder.jpg'}
+                        alt={product.name || product.title || 'Sản phẩm'}
+                        className="w-full h-20 object-cover rounded mb-2"
+                      />
+                      <div className="min-h-[40px]">
+                        <h3 className="text-xs font-medium text-gray-900 line-clamp-2 mb-1">
+                          {product.name || product.title || 'Sản phẩm'}
+                        </h3>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600">
+                        {formatPrice(product.price)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Group Information */}
@@ -267,7 +333,7 @@ export default function CreateGroupPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Sản phẩm</span>
                     <span className="font-medium text-gray-900 text-right">
-                      {selectedProductData.title}
+                      {selectedProductData?.name || selectedProductData?.title}
                     </span>
                   </div>
                 )}
@@ -332,14 +398,23 @@ export default function CreateGroupPage() {
                 </div>
               </div>
 
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+
               <button
                 onClick={handleCreateGroup}
                 disabled={
-                  !selectedProduct || !recipientName || !deliveryAddress
+                  submitting ||
+                  !selectedProduct ||
+                  !recipientName ||
+                  !deliveryAddress
                 }
                 className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                Tạo nhóm ngay
+                {submitting ? 'Đang tạo nhóm...' : 'Tạo nhóm ngay'}
               </button>
 
               <p className="text-xs text-gray-600 mt-3 text-center">

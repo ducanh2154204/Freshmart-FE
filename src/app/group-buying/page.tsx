@@ -1,68 +1,113 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { GroupBuyingCard } from '@/components/GroupBuyingCard'
+import { groupBuyingService } from '@/services/group-buying.service'
+import { productService } from '@/services/product.service'
+import type { GroupBuying } from '@/types/group-buying'
+import type { Product } from '@/types/product'
 import Link from 'next/link'
 
 export default function GroupBuyingPage() {
-  const ongoingDeals = [
-    {
-      image:
-        'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80',
-      title: 'Combo 5kg gạo ST25 cao cấp',
-      currentPrice: 164000,
-      originalPrice: 240000,
-      rating: 5,
-      participants: 45,
-      timeLeft: 'Còn 2 ngày 15 giờ',
-      deliveryInfo: 'Giao hàng miễn phí trong nội thành TP.HCM, Hà Nội',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80',
-      title: 'Hộp sữa tươi tiệt trùng Vinamilk 100% (1 lít x 12 hộp)',
-      currentPrice: 360000,
-      originalPrice: 420000,
-      rating: 5,
-      participants: 89,
-      timeLeft: 'Còn 1 ngày 8 giờ',
-      deliveryInfo: 'Miễn phí vận chuyển toàn quốc cho đơn hàng từ 300.000đ',
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&q=80',
-      title: 'Combo trái cây tươi ngon (Nho + Kiwi + Xoài)',
-      currentPrice: 245000,
-      originalPrice: 350000,
-      rating: 5,
-      participants: 62,
-      timeLeft: 'Còn 3 ngày 5 giờ',
-      deliveryInfo: 'Giao hàng nhanh trong 24h tại khu vực nội thành',
-    },
-  ]
+  const [ongoingDeals, setOngoingDeals] = useState<GroupBuying[]>([])
+  const [groupBuyingProducts, setGroupBuyingProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const groupBuyingProducts = [
-    {
-      image:
-        'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
-      title: 'Thùng 30 trứng gà omega 3',
-      currentPrice: 120000,
-      originalPrice: 180000,
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3?w=400&q=80',
-      title: 'Combo rau củ quả hữu cơ',
-      currentPrice: 180000,
-      originalPrice: 250000,
-    },
-    {
-      image:
-        'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&q=80',
-      title: 'Thùng thịt heo sạch 5kg',
-      currentPrice: 450000,
-      originalPrice: 580000,
-    },
-  ]
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+
+      // Fetch active group buyings (separate try-catch để không ảnh hưởng đến products)
+      // TODO: Uncomment khi BE đã có endpoint group buying
+      try {
+        const dealsResponse = await groupBuyingService.getActiveGroupBuyings({
+          limit: 10,
+        })
+        const dealsData = dealsResponse as any
+
+        // Debug log để xem response structure
+        console.log('Group buying response:', dealsData)
+
+        const deals =
+          dealsData?.data?.data ?? dealsData?.data ?? dealsData ?? []
+
+        // Kiểm tra nếu deals là array
+        if (Array.isArray(deals) && deals.length > 0) {
+          const mappedDeals = deals.map((deal: GroupBuying) => ({
+            id: deal.id,
+            productId: deal.productId || deal.product?.id || 0,
+            quantity: deal.quantity || deal.targetQuantity || 1,
+            image:
+              deal.image || deal.product?.image || '/images/placeholder.jpg',
+            title: deal.title || deal.product?.name || 'Sản phẩm',
+            currentPrice: deal.currentPrice || 0,
+            originalPrice: deal.originalPrice || deal.product?.price || 0,
+            rating: deal.rating || 5,
+            participants: deal.participants || deal.currentParticipants || 0,
+            timeLeft: deal.timeLeft,
+            deliveryInfo: deal.deliveryInfo,
+          }))
+
+          setOngoingDeals(mappedDeals)
+        } else {
+          console.log('No group buying deals found or invalid format')
+        }
+      } catch (err: any) {
+        // Log chi tiết hơn để debug
+        const errorInfo = {
+          message: err?.message,
+          status: err?.status,
+          code: err?.code,
+          name: err?.name,
+          stack: err?.stack,
+          toString: String(err),
+          keys: err ? Object.keys(err) : [],
+        }
+        console.warn('Group buying API not available or error:', errorInfo)
+        // Giữ default deals nếu API fail - không throw error để không block UI
+      }
+
+      // Fetch products for group buying (separate try-catch)
+      try {
+        const productsResponse = await productService.getProducts({
+          limit: 6,
+        })
+        const productsData = productsResponse as any
+        const products =
+          productsData?.data?.data ?? productsData?.data ?? productsData ?? []
+
+        if (Array.isArray(products) && products.length > 0) {
+          const mappedProducts = products.slice(0, 6).map((p: Product) => ({
+            id: p.id,
+            name: p.name || p.title || '',
+            image: p.image || '/images/placeholder.jpg',
+            title: p.name || p.title || '',
+            price: p.price,
+            currentPrice: p.price,
+            originalPrice: p.originalPrice || p.price,
+          }))
+
+          setGroupBuyingProducts(mappedProducts)
+        }
+      } catch (err: any) {
+        console.error('Error fetching products:', {
+          message: err?.message,
+          status: err?.status,
+          error: err,
+        })
+        // Giữ default products nếu API fail
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const displayDeals = ongoingDeals
+  const displayProducts = groupBuyingProducts
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -207,11 +252,79 @@ export default function GroupBuyingPage() {
               Tạo nhóm mới
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {ongoingDeals.map((deal, index) => (
-              <GroupBuyingCard key={index} {...deal} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-lg shadow-md h-96 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : displayDeals.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <div className="text-center max-w-md">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
+                  <svg
+                    className="w-10 h-10 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Hiện tại chưa có nhóm mua chung nào
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Hãy là người đầu tiên tạo nhóm mua chung và nhận được giá tốt
+                  nhất!
+                </p>
+                <Link
+                  href="/group-buying/create"
+                  className="inline-flex items-center gap-2 px-6 py-3 text-base font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Tạo nhóm mua chung
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {displayDeals.map((deal, index) => (
+                <GroupBuyingCard
+                  key={deal.id || `deal-${index}`}
+                  id={deal.id}
+                  image={deal.image || ''}
+                  title={deal.title || ''}
+                  currentPrice={deal.currentPrice}
+                  originalPrice={deal.originalPrice}
+                  rating={deal.rating}
+                  participants={deal.participants}
+                  timeLeft={deal.timeLeft}
+                  deliveryInfo={deal.deliveryInfo}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -221,11 +334,56 @@ export default function GroupBuyingPage() {
           <h2 className="text-gray-800 text-2xl font-bold mb-6">
             Sản phẩm mua chung
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {groupBuyingProducts.map((product, index) => (
-              <GroupBuyingCard key={index} {...product} size="small" />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-lg shadow-md h-48 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : displayProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <div className="text-center max-w-md">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-3">
+                  <svg
+                    className="w-8 h-8 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  Chưa có sản phẩm
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Các sản phẩm mua chung sẽ xuất hiện tại đây
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {displayProducts.map((product, index) => (
+                <GroupBuyingCard
+                  key={product.id || `product-${index}`}
+                  id={product.id}
+                  image={product.image}
+                  title={product.title || product.name}
+                  currentPrice={product.price}
+                  originalPrice={product.originalPrice || product.price}
+                  size="small"
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
