@@ -24,6 +24,8 @@ export default function PaymentPage() {
     null
   )
   const [polling, setPolling] = useState(false)
+  const [pollingTimeout, setPollingTimeout] = useState(false)
+  const [countdown, setCountdown] = useState(0)
 
   useEffect(() => {
     if (!orderId) {
@@ -92,6 +94,20 @@ export default function PaymentPage() {
 
     try {
       setPolling(true)
+      setPollingTimeout(false)
+      const maxTime = 200 // 10 phút
+      setCountdown(maxTime)
+
+      // Countdown timer
+      const countdownInterval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 3000)
 
       await orderService.pollOrderStatus(
         orderId,
@@ -108,17 +124,51 @@ export default function PaymentPage() {
 
           // Nếu đã thanh toán thành công
           if (status.status === 'PAID') {
+            clearInterval(countdownInterval)
             alert('Thanh toán thành công! Đơn hàng của bạn đang được xử lý.')
             router.push(`/group-buying`)
           }
         },
         3000, // Poll mỗi 3 giây
-        60 // Tối đa 3 phút
+        200 // Tối đa 10 phút (tăng từ 3 phút)
       )
+      clearInterval(countdownInterval)
     } catch (err: any) {
       console.error('Polling error:', err)
+      if (err?.message?.includes('Timeout')) {
+        setPollingTimeout(true)
+      }
     } finally {
       setPolling(false)
+      setCountdown(0)
+    }
+  }
+
+  const handleCheckPaymentStatus = async () => {
+    if (!orderId) return
+
+    try {
+      setError(null)
+      const response = await orderService.getOrderStatus(orderId)
+      const statusData = (response as any).data || response
+
+      if (statusData && statusData.status) {
+        setOrderStatus(statusData)
+
+        if (statusData.status === 'PAID') {
+          alert('Thanh toán thành công! Đơn hàng của bạn đang được xử lý.')
+          router.push(`/group-buying`)
+        } else if (statusData.status === 'PENDING') {
+          alert(
+            'Đơn hàng vẫn chưa được thanh toán. Vui lòng hoàn tất thanh toán.'
+          )
+        } else {
+          alert(`Trạng thái đơn hàng: ${statusData.status}`)
+        }
+      }
+    } catch (err: any) {
+      console.error('Check status error:', err)
+      setError('Không thể kiểm tra trạng thái đơn hàng')
     }
   }
 
@@ -156,6 +206,25 @@ export default function PaymentPage() {
     groupBuy?.product?.originalPrice ||
     groupBuy?.product?.price ||
     currentPrice
+
+  // Validate and get safe image URL
+  const getImageUrl = () => {
+    if (!groupBuy) return '/images/placeholder.png'
+
+    const image = groupBuy.product?.image || groupBuy.image
+    if (!image) return '/images/placeholder.png'
+
+    // Check if it's a valid absolute URL
+    try {
+      new URL(image)
+      return image
+    } catch {
+      // If not a valid URL, check if it's a local path
+      if (image.startsWith('/')) return image
+      // Otherwise use placeholder
+      return '/images/placeholder.png'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -209,11 +278,35 @@ export default function PaymentPage() {
                   </div>
                 )}
                 {polling && orderStatus?.status !== 'PAID' && (
-                  <div className="flex items-center justify-center gap-2 mt-4 text-gray-600">
-                    <LoadingSpinner />
-                    <span className="text-sm">
-                      Đang chờ xác nhận thanh toán...
-                    </span>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-center gap-2 text-gray-600">
+                      <LoadingSpinner />
+                      <span className="text-sm">
+                        Đang chờ xác nhận thanh toán...
+                      </span>
+                    </div>
+                    {countdown > 0 && (
+                      <p className="text-xs text-center text-gray-500">
+                        Tự động kiểm tra trong{' '}
+                        {Math.floor((countdown * 3) / 60)} phút{' '}
+                        {Math.floor((countdown * 3) % 60)} giây
+                      </p>
+                    )}
+                  </div>
+                )}
+                {pollingTimeout && orderStatus?.status !== 'PAID' && (
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-sm text-yellow-800 mb-2">
+                      ⏰ Hết thời gian chờ. Vui lòng kiểm tra lại hoặc liên hệ
+                      hỗ trợ nếu đã thanh toán.
+                    </p>
+                    <Button
+                      onClick={startPolling}
+                      variant="outline"
+                      className="w-full text-sm py-2"
+                    >
+                      Thử lại
+                    </Button>
                   </div>
                 )}
               </div>
@@ -233,11 +326,7 @@ export default function PaymentPage() {
                 <div className="flex gap-3">
                   <div className="relative w-20 h-20 flex-shrink-0">
                     <Image
-                      src={
-                        groupBuy.product?.image ||
-                        groupBuy.image ||
-                        '/images/placeholder.png'
-                      }
+                      src={getImageUrl()}
                       alt={
                         groupBuy.product?.name || groupBuy.title || 'Product'
                       }
@@ -286,6 +375,14 @@ export default function PaymentPage() {
             )}
 
             <div className="mt-6 space-y-2">
+              {orderStatus?.status !== 'PAID' && (
+                <Button
+                  onClick={handleCheckPaymentStatus}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold"
+                >
+                  ✓ Tôi đã thanh toán
+                </Button>
+              )}
               <Button
                 onClick={() => router.push('/group-buying')}
                 variant="outline"

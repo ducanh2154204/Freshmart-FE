@@ -17,6 +17,7 @@ export default function CreateGroupPage() {
   const [maxPeople, setMaxPeople] = useState('')
   const [duration, setDuration] = useState('')
   const [recipientName, setRecipientName] = useState('')
+  const [recipientPhone, setRecipientPhone] = useState('')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,15 +54,27 @@ export default function CreateGroupPage() {
   const selectedProductData = displayProducts.find(
     p => p.id === selectedProduct
   )
-  const subtotal = selectedProductData
-    ? selectedProductData.price * quantity
-    : 0
+
+  // Tính giá giảm (10% discount khi mua chung)
+  const discountPercent = 0.1 // 10%
+  const originalPrice = selectedProductData?.price || 0
+  const discountedPrice = Math.round(originalPrice * (1 - discountPercent))
+
+  // Tính các giá trị
+  const subtotal = selectedProductData ? discountedPrice * quantity : 0
   const shipping = 20000
-  const discount = 0
-  const total = subtotal + shipping - discount
+  const discountAmount = selectedProductData
+    ? (originalPrice - discountedPrice) * quantity
+    : 0
+  const total = subtotal + shipping
 
   const handleCreateGroup = async () => {
-    if (!selectedProduct || !recipientName || !deliveryAddress) {
+    if (
+      !selectedProduct ||
+      !recipientName ||
+      !recipientPhone ||
+      !deliveryAddress
+    ) {
       setError('Vui lòng điền đầy đủ thông tin')
       return
     }
@@ -80,24 +93,35 @@ export default function CreateGroupPage() {
       const durationHours = parseInt(duration)
       const endTime = new Date(now.getTime() + durationHours * 60 * 60 * 1000)
 
-      // Calculate discount (giả sử giảm 10% khi mua chung)
-      const originalPrice = selectedProductData?.price || 0
-      const discountPercent = 0.1 // 10%
-      const discountPrice = Math.round(originalPrice * (1 - discountPercent))
-
       const payload = {
         productId: selectedProduct,
-        discountPrice: discountPrice,
+        discountPrice: discountedPrice,
         targetQuantity: parseInt(maxPeople),
         endTime: endTime.toISOString(),
-        deliveryAddress: deliveryAddress,
+        deliveryDetail: {
+          name: recipientName,
+          phone: recipientPhone,
+          address: deliveryAddress,
+        },
       }
 
       const response = await groupBuyingService.createGroupBuying(payload)
       console.log('Group created:', response)
 
-      // Redirect to group buying page or detail page
-      router.push('/group-buying')
+      // Lấy ID của nhóm vừa tạo từ response
+      const responseData = response as any
+      const groupBuyId =
+        responseData?.data?.id ||
+        responseData?.data?.data?.id ||
+        responseData?.id
+
+      // Redirect về trang detail của nhóm vừa tạo để thanh toán
+      if (groupBuyId) {
+        router.push(`/group-buying/${groupBuyId}`)
+      } else {
+        // Fallback nếu không lấy được ID
+        router.push('/group-buying')
+      }
     } catch (err) {
       const apiError = err as ApiError
       setError(
@@ -304,6 +328,20 @@ export default function CreateGroupPage() {
                   />
                 </div>
 
+                {/* Recipient Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    value={recipientPhone}
+                    onChange={e => setRecipientPhone(e.target.value)}
+                    placeholder="Nhập số điện thoại (VD: 0912345678)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                  />
+                </div>
+
                 {/* Delivery Address */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -345,6 +383,24 @@ export default function CreateGroupPage() {
                   </span>
                 </div>
 
+                {selectedProductData && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Giá gốc</span>
+                    <span className="font-medium text-gray-400 line-through">
+                      {formatPrice(originalPrice * quantity)}
+                    </span>
+                  </div>
+                )}
+
+                {selectedProductData && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Giá mua chung</span>
+                    <span className="font-medium text-green-600">
+                      {formatPrice(discountedPrice * quantity)}
+                    </span>
+                  </div>
+                )}
+
                 {maxPeople && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Số người</span>
@@ -369,22 +425,6 @@ export default function CreateGroupPage() {
                     {formatPrice(shipping)}
                   </span>
                 </div>
-
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tạm tính</span>
-                  <span className="font-medium text-gray-900">
-                    {formatPrice(subtotal)}
-                  </span>
-                </div>
-
-                {discount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ưu đãi</span>
-                    <span className="font-medium text-green-600">
-                      -{formatPrice(discount)}
-                    </span>
-                  </div>
-                )}
               </div>
 
               <div className="border-t border-green-200 pt-4 mb-4">

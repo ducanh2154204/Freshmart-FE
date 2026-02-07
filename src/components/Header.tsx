@@ -67,8 +67,7 @@ export const Header: React.FC = () => {
     if (parts.length < 2) return null
     try {
       const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-      const padded =
-        payload + '==='.slice((payload.length + 3) % 4) // base64 padding
+      const padded = payload + '==='.slice((payload.length + 3) % 4) // base64 padding
       const json = JSON.parse(atob(padded))
       const sub = (json?.sub as string | undefined) || ''
       const account = (json?.accountId as string | number | undefined) ?? ''
@@ -134,8 +133,8 @@ export const Header: React.FC = () => {
   }
 
   return (
-    <header className="bg-white shadow-sm">
-      <div className="container mx-auto px-4">
+    <header className="bg-white shadow-sm" suppressHydrationWarning>
+      <div className="container mx-auto px-4" suppressHydrationWarning>
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">

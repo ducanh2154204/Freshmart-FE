@@ -36,8 +36,8 @@ export default function GroupBuyingDetailPage() {
   const [groupBuy, setGroupBuy] = useState<GroupBuying | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isJoining, setIsJoining] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [timeRemaining, setTimeRemaining] = useState({
     days: 0,
     hours: 0,
@@ -48,6 +48,21 @@ export default function GroupBuyingDetailPage() {
 
   useEffect(() => {
     fetchGroupBuyDetails()
+    // Lấy userId hiện tại từ localStorage
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken')
+      if (token) {
+        try {
+          // Decode JWT để lấy userId
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          setCurrentUserId(payload.userId || payload.id || payload.sub)
+        } catch (e) {
+          // Nếu không decode được, thử lấy từ localStorage
+          const userId = localStorage.getItem('userId')
+          setCurrentUserId(userId)
+        }
+      }
+    }
   }, [groupBuyId])
 
   // Real-time countdown timer
@@ -98,22 +113,60 @@ export default function GroupBuyingDetailPage() {
     }
   }
 
-  const handleJoinGroup = async () => {
-    try {
-      setIsJoining(true)
-      await groupBuyingService.joinGroupBuying(groupBuyId)
-      // Refresh data after joining
-      await fetchGroupBuyDetails()
-      alert('Tham gia nhóm thành công!')
-    } catch (err: any) {
-      alert(err.message || 'Không thể tham gia nhóm')
-    } finally {
-      setIsJoining(false)
+  const handleCheckout = () => {
+    // Kiểm tra xem user đã đăng nhập chưa
+    const token =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem('accessToken')
+        : null
+
+    if (!token) {
+      // Chưa đăng nhập → redirect về trang auth
+      // Lưu returnUrl để sau khi login xong quay lại
+      const returnUrl = encodeURIComponent(
+        `/group-buying/${groupBuyId}/checkout`
+      )
+      router.push(`/auth?returnUrl=${returnUrl}`)
+      return
     }
+
+    // Đã đăng nhập → chuyển sang trang checkout
+    router.push(`/group-buying/${groupBuyId}/checkout`)
   }
 
-  const handleCheckout = () => {
-    router.push(`/group-buying/${groupBuyId}/checkout`)
+  // Kiểm tra xem user hiện tại có phải là chủ nhóm không
+  const isGroupOwner = () => {
+    if (!currentUserId || !groupBuy) return false
+    const creatorId = String(
+      (groupBuy as any).creatorId || groupBuy.userId || groupBuy.createdBy || ''
+    )
+    return creatorId === String(currentUserId)
+  }
+
+  // Kiểm tra xem user đã tham gia nhóm chưa (và đã thanh toán)
+  const isParticipant = () => {
+    if (!currentUserId || !groupBuy) return false
+    if (Array.isArray(groupBuy.participants)) {
+      const participant = groupBuy.participants.find(
+        (p: any) => String(p.userId || p.id) === String(currentUserId)
+      )
+
+      if (!participant) return false
+
+      // Kiểm tra xem participant đã thanh toán chưa
+      // Backend trả về paymentStatus: "PAID" (uppercase)
+      const isPaid =
+        participant.isPaid === true ||
+        participant.paymentStatus === 'PAID' ||
+        participant.paymentStatus === 'paid' ||
+        participant.status === 'PAID' ||
+        participant.status === 'paid' ||
+        participant.paymentDate != null ||
+        participant.paidAt != null
+
+      return isPaid
+    }
+    return false
   }
 
   if (loading) {
@@ -159,17 +212,28 @@ export default function GroupBuyingDetailPage() {
     groupBuy.product?.price ||
     currentPrice
 
-  const discount = originalPrice - currentPrice
+  // Tính discount an toàn
+  const discount = Math.max(0, originalPrice - currentPrice)
   const discountPercent =
-    originalPrice > 0 ? Math.round((discount / originalPrice) * 100) : 0
+    originalPrice > 0 && discount > 0
+      ? Math.round((discount / originalPrice) * 100)
+      : 0
 
   // Tính số người: backend đã tính sẵn người tạo trong currentQuantity
-  const targetPeople = groupBuy.targetQuantity || groupBuy.maxParticipants || 10
-  const currentPeople =
+  const targetPeople = Number(
+    groupBuy.targetQuantity || groupBuy.maxParticipants || 10
+  )
+  const participantsValue = Array.isArray(groupBuy.participants)
+    ? groupBuy.participants.length
+    : typeof groupBuy.participants === 'number'
+      ? groupBuy.participants
+      : 0
+  const currentPeople = Number(
     groupBuy.currentQuantity ||
-    groupBuy.currentParticipants ||
-    groupBuy.participants ||
-    0
+      groupBuy.currentParticipants ||
+      participantsValue ||
+      0
+  )
   const progress = (currentPeople / targetPeople) * 100
 
   // Calculate costs
@@ -370,7 +434,7 @@ export default function GroupBuyingDetailPage() {
                       onChange={e =>
                         setQuantity(Math.max(1, parseInt(e.target.value) || 1))
                       }
-                      className="w-20 h-10 text-center border-2 border-gray-300 rounded-lg text-gray-900 font-semibold text-lg"
+                      className="w-20 h-10 text-center border-2 border-gray-300 rounded-lg text-gray-900 font-semibold text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <button
                       onClick={() => setQuantity(quantity + 1)}
@@ -385,13 +449,13 @@ export default function GroupBuyingDetailPage() {
                 <div className="border-2 border-gray-200 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Giá mua chung</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900">
                       {itemPrice.toLocaleString('vi-VN')}đ
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Phí vận chuyển</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900">
                       {shippingFee.toLocaleString('vi-VN')}đ
                     </span>
                   </div>
@@ -407,20 +471,52 @@ export default function GroupBuyingDetailPage() {
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <Button
-                    onClick={handleCheckout}
-                    disabled={timeRemaining.expired}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg font-bold text-lg disabled:bg-gray-400"
-                  >
-                    Đặt Trước/Mời Nhóm Thanh Toán
-                  </Button>
+                  {isParticipant() ? (
+                    // Đã tham gia nhóm (đã thanh toán)
+                    <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4 text-center">
+                      <p className="text-green-700 font-semibold mb-2">
+                        ✓ Bạn đã tham gia nhóm này
+                      </p>
+                      <Button
+                        onClick={() => router.push('/profile')}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold"
+                      >
+                        Xem đơn hàng của tôi
+                      </Button>
+                    </div>
+                  ) : (
+                    // Chưa thanh toán - hiển thị nút thanh toán (cả chủ nhóm và người khác)
+                    <>
+                      {isGroupOwner() && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+                          <p className="text-blue-700 text-sm font-medium text-center">
+                            💡 Bạn là chủ nhóm. Vui lòng thanh toán để hoàn tất
+                            tạo nhóm
+                          </p>
+                        </div>
+                      )}
 
-                  <div className="text-xs text-center text-gray-500">
-                    Bằng việc nhấn "Đặt trước", bạn đồng ý với{' '}
-                    <a href="#" className="text-green-600 hover:underline">
-                      Điều khoản sử dụng
-                    </a>
-                  </div>
+                      <Button
+                        onClick={handleCheckout}
+                        disabled={timeRemaining.expired}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg font-bold text-lg disabled:bg-gray-400"
+                      >
+                        {!currentUserId
+                          ? 'Đăng Nhập để Tham Gia'
+                          : isGroupOwner()
+                            ? 'Thanh Toán & Hoàn Tất Tạo Nhóm'
+                            : 'Tham Gia Nhóm & Thanh Toán'}
+                      </Button>
+
+                      <div className="text-xs text-center text-gray-500">
+                        Bằng việc {isGroupOwner() ? 'thanh toán' : 'tham gia'},
+                        bạn đồng ý với{' '}
+                        <a href="#" className="text-green-600 hover:underline">
+                          Điều khoản sử dụng
+                        </a>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

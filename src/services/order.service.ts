@@ -63,6 +63,15 @@ export const orderService = {
       const pollInterval = setInterval(async () => {
         attempts++
 
+        console.log(`Polling attempt ${attempts}/${maxAttempts}`)
+
+        // Kiểm tra timeout TRƯỚC khi gọi API
+        if (attempts > maxAttempts) {
+          clearInterval(pollInterval)
+          reject(new Error('Timeout: Không thể xác nhận trạng thái thanh toán'))
+          return
+        }
+
         try {
           const response = await this.getOrderStatus(orderId)
           console.log('Polling response:', response)
@@ -90,18 +99,11 @@ export const orderService = {
             clearInterval(pollInterval)
             resolve(statusData)
           }
-
-          // Nếu đã poll quá số lần cho phép
-          if (attempts >= maxAttempts) {
-            clearInterval(pollInterval)
-            reject(
-              new Error('Timeout: Không thể xác nhận trạng thái thanh toán')
-            )
-          }
         } catch (error) {
           console.error('Poll error:', error)
-          clearInterval(pollInterval)
-          reject(error)
+          // Không dừng polling khi gặp lỗi API, chỉ log và tiếp tục
+          // clearInterval(pollInterval)
+          // reject(error)
         }
       }, interval)
     })

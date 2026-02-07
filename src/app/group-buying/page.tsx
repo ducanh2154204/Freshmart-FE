@@ -14,6 +14,70 @@ export default function GroupBuyingPage() {
   const [ongoingDeals, setOngoingDeals] = useState<GroupBuying[]>([])
   const [groupBuyingProducts, setGroupBuyingProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  // Get current user ID (from localStorage or auth service)
+  useEffect(() => {
+    // Check all possible keys
+    const userStr = localStorage.getItem('user')
+    const token = localStorage.getItem('token')
+    const accessToken = localStorage.getItem('accessToken')
+    const authUser = localStorage.getItem('authUser')
+
+    console.log('🔐 Checking user auth...', {
+      hasUser: !!userStr,
+      hasToken: !!token,
+      hasAccessToken: !!accessToken,
+      hasAuthUser: !!authUser,
+      allKeys: Object.keys(localStorage),
+    })
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        const userId = user.id || user.userId
+        console.log('✅ Current user logged in:', {
+          user,
+          userId,
+          userIdType: typeof userId,
+        })
+        setCurrentUserId(userId)
+      } catch (e) {
+        console.error('❌ Error parsing user:', e)
+      }
+    } else if (accessToken || token) {
+      // If we have token but no user, try to decode token
+      const tokenToUse = accessToken || token
+      if (tokenToUse) {
+        console.log('🔑 Have token but no user object, decoding token...')
+        try {
+          // JWT tokens have 3 parts: header.payload.signature
+          const parts = tokenToUse.split('.')
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]))
+            console.log('📜 Token payload:', payload)
+            const userId = payload.id || payload.userId || payload.sub
+            if (userId) {
+              console.log('✅ Found userId in token:', userId)
+              setCurrentUserId(userId)
+            } else {
+              console.warn('⚠️ Token decoded but no userId found')
+            }
+          }
+        } catch (e) {
+          console.error('❌ Error decoding token:', e)
+        }
+      }
+    } else {
+      console.log('⚠️ No user or token found in localStorage')
+    }
+  }, [])
+
+  const handleJoinGroup = async (groupId: number | string) => {
+    // Chỉ navigate đến trang detail để xem thông tin
+    // Join thực sự sẽ diễn ra sau khi thanh toán thành công
+    window.location.href = `/group-buying/${groupId}`
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,31 +92,78 @@ export default function GroupBuyingPage() {
         const dealsData = dealsResponse as any
 
         // Debug log để xem response structure
-        console.log('Group buying response:', dealsData)
+        console.log('🛒 Group buying API response:', dealsData)
 
         const deals =
           dealsData?.data?.data ?? dealsData?.data ?? dealsData ?? []
 
+        console.log(`📊 Found ${Array.isArray(deals) ? deals.length : 0} deals`)
+
         // Kiểm tra nếu deals là array
         if (Array.isArray(deals) && deals.length > 0) {
-          const mappedDeals = deals.map((deal: GroupBuying) => ({
-            id: deal.id,
-            productId: deal.productId || deal.product?.id || 0,
-            quantity: deal.quantity || deal.targetQuantity || 1,
-            image:
-              deal.image || deal.product?.image || '/images/placeholder.jpg',
-            title: deal.title || deal.product?.name || 'Sản phẩm',
-            currentPrice: deal.currentPrice || 0,
-            originalPrice: deal.originalPrice || deal.product?.price || 0,
-            rating: deal.rating || 5,
-            participants: deal.participants || deal.currentParticipants || 0,
-            timeLeft: deal.timeLeft,
-            deliveryInfo: deal.deliveryInfo,
-          }))
+          const mappedDeals = deals.map((deal: any) => {
+            // Parse string prices to numbers (API trả về string)
+            const productPrice = parseFloat(deal.product?.price || '0')
+            const productOriginalPrice = parseFloat(
+              deal.product?.originalPrice || deal.product?.price || '0'
+            )
+            const discountPrice =
+              parseFloat(deal.discountPrice || '0') ||
+              Math.round(productPrice * 0.9)
 
+            const mappedDeal = {
+              id: deal.id,
+              productId: deal.productId || deal.product?.id || 0,
+              quantity: deal.quantity || deal.targetQuantity || 1,
+              image:
+                deal.image || deal.product?.image || '/images/placeholder.jpg',
+              title: deal.title || deal.product?.name || 'Sản phẩm',
+              currentPrice: discountPrice,
+              originalPrice: productOriginalPrice,
+              rating: deal.rating || deal.product?.rating || 5,
+              participants: deal.participants || [],
+              participantsCount: Array.isArray(deal.participants)
+                ? deal.participants.length
+                : deal.currentParticipants || 0,
+              targetQuantity: deal.targetQuantity || 10,
+              currentQuantity:
+                deal.currentQuantity ||
+                (Array.isArray(deal.participants)
+                  ? deal.participants.length
+                  : 0),
+              endTime: deal.endTime,
+              timeLeft: deal.timeLeft,
+              deliveryInfo: deal.deliveryAddress,
+              userId: deal.userId || deal.user?.id,
+              // Nếu không có userId từ API, lấy userId của người đầu tiên trong participants
+              createdBy: String(
+                deal.userId ||
+                  deal.user?.id ||
+                  (Array.isArray(deal.participants) &&
+                  deal.participants.length > 0
+                    ? deal.participants[0]?.userId ||
+                      deal.participants[0]?.user?.id
+                    : '')
+              ),
+            }
+            console.log(`📦 Deal ${mappedDeal.id} mapped:`, {
+              dealId: mappedDeal.id,
+              createdBy: mappedDeal.createdBy,
+              createdByType: typeof mappedDeal.createdBy,
+              rawUserId: deal.userId,
+              rawUserObj: deal.user,
+              firstParticipant:
+                Array.isArray(deal.participants) && deal.participants.length > 0
+                  ? deal.participants[0]
+                  : null,
+            })
+            return mappedDeal
+          })
+
+          console.log(`✅ Mapped ${mappedDeals.length} deals successfully`)
           setOngoingDeals(mappedDeals)
         } else {
-          console.log('No group buying deals found or invalid format')
+          console.log('⚠️ No group buying deals found or invalid format')
         }
       } catch (err: any) {
         // Log chi tiết hơn để debug
@@ -193,7 +304,9 @@ export default function GroupBuyingPage() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-700 text-white text-2xl font-bold mb-4">
                 1
               </div>
-              <h3 className="text-lg font-semibold mb-2">Chọn sản phẩm</h3>
+              <h3 className="text-gray-900 text-lg font-semibold mb-2">
+                Chọn sản phẩm
+              </h3>
               <p className="text-sm text-gray-600">
                 Tạo hoặc tham gia nhóm mua chung cho sản phẩm bạn thích
               </p>
@@ -202,7 +315,9 @@ export default function GroupBuyingPage() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-700 text-white text-2xl font-bold mb-4">
                 2
               </div>
-              <h3 className="text-lg font-semibold mb-2">Mời bạn bè</h3>
+              <h3 className="text-gray-900 text-lg font-semibold mb-2">
+                Mời bạn bè
+              </h3>
               <p className="text-sm text-gray-600">
                 Chia sẻ link với bạn bè và hàng xóm để đủ số lượng tối thiểu
               </p>
@@ -211,7 +326,9 @@ export default function GroupBuyingPage() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-700 text-white text-2xl font-bold mb-4">
                 3
               </div>
-              <h3 className="text-lg font-semibold mb-2">Nhận hàng</h3>
+              <h3 className="text-gray-900 text-lg font-semibold mb-2">
+                Nhận hàng
+              </h3>
               <p className="text-sm text-gray-600">
                 Khi đủ người, đơn hàng sẽ được xử lý và giao đến tận nơi
               </p>
@@ -319,8 +436,16 @@ export default function GroupBuyingPage() {
                   originalPrice={deal.originalPrice}
                   rating={deal.rating}
                   participants={deal.participants}
+                  targetQuantity={deal.targetQuantity}
+                  currentQuantity={deal.currentQuantity}
+                  endTime={deal.endTime}
                   timeLeft={deal.timeLeft}
                   deliveryInfo={deal.deliveryInfo}
+                  currentUserId={
+                    currentUserId ? String(currentUserId) : undefined
+                  }
+                  createdBy={deal.createdBy}
+                  onJoin={() => handleJoinGroup(deal.id)}
                 />
               ))}
             </div>
