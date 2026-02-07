@@ -2,6 +2,8 @@
 export interface GroupBuying {
   id: number | string
   productId: number | string
+  userId?: string | number
+  createdBy?: string | number
   product?: {
     id: number | string
     name: string
@@ -18,13 +20,19 @@ export interface GroupBuying {
   currentQuantity?: number
   maxParticipants?: number
   currentParticipants?: number
-  participants?: number
+  participants?: any[] | number
+  participantsCount?: number
   status?: 'active' | 'completed' | 'cancelled' | 'expired'
   startTime?: string
   endTime?: string
   timeLeft?: string
   deliveryInfo?: string
   deliveryAddress?: string
+  deliveryDetail?: {
+    name: string
+    phone: string
+    address: string
+  }
   recipientName?: string
   rating?: number
   createdAt?: string
@@ -36,7 +44,11 @@ export interface CreateGroupBuyingPayload {
   discountPrice: number
   targetQuantity: number
   endTime: string // ISO 8601 format
-  deliveryAddress: string // Required
+  deliveryDetail: {
+    name: string
+    phone: string
+    address: string
+  }
 }
 
 export interface GroupBuyingListParams {

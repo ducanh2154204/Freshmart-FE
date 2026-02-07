@@ -1,16 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   images: {
-    domains: [],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'product.hstatic.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.qrserver.com',
+      },
+    ],
     formats: ['image/avif', 'image/webp'],
-  },
-  // Enable experimental features if needed
-  experimental: {
-    // optimizePackageImports: ['@/components'],
   },
 }
 
 module.exports = nextConfig
-

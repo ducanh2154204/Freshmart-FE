@@ -19,34 +19,92 @@ export default function GroupBuyingCheckoutPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'ONLINE'>('COD')
+  const [hasJoined, setHasJoined] = useState(false)
 
   useEffect(() => {
-    fetchGroupBuyDetails()
+    initCheckout()
   }, [groupBuyId])
 
-  const fetchGroupBuyDetails = async () => {
+  const initCheckout = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Dùng API GET /group-buys/{id}
-      const response = await groupBuyingService.getGroupBuyingById(groupBuyId)
+      // Kiểm tra đăng nhập
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setError('Vui lòng đăng nhập để tiếp tục')
+        router.push('/auth')
+        return
+      }
 
-      // Response có thể là { data: {...} } hoặc direct object
+      // Lấy userId từ token
+      const getCurrentUserId = () => {
+        try {
+          const token = localStorage.getItem('accessToken')
+          if (!token) return null
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          return payload.userId || payload.sub || payload.id
+        } catch {
+          return null
+        }
+      }
+      const currentUserId = getCurrentUserId()
+
+      // Fetch group buy details
+      const response = await groupBuyingService.getGroupBuyingById(groupBuyId)
       const groupBuyData =
         (response as any)?.data?.data || (response as any)?.data || response
 
-      if (groupBuyData && groupBuyData.id) {
-        setGroupBuy(groupBuyData)
-      } else {
+      if (!groupBuyData || !groupBuyData.id) {
         throw new Error(`Không tìm thấy nhóm mua chung với ID ${groupBuyId}`)
       }
+
+      setGroupBuy(groupBuyData)
+
+      // Kiểm tra xem user đã join chưa (check trong participants array)
+      const participants = Array.isArray(groupBuyData.participants)
+        ? groupBuyData.participants
+        : []
+      const isAlreadyJoined = participants.some(
+        (p: any) => String(p.userId) === String(currentUserId)
+      )
+
+      console.log('Current user ID:', currentUserId)
+      console.log('Participants:', participants)
+      console.log('Already joined:', isAlreadyJoined)
+
+      if (!isAlreadyJoined) {
+        // Chưa join → gọi API join
+        console.log('User has not joined yet, calling join API...')
+        try {
+          const joinResponse =
+            await groupBuyingService.joinGroupBuying(groupBuyId)
+          console.log('Join response:', joinResponse)
+          setHasJoined(true)
+
+          // Refresh group buy data sau khi join
+          const updatedResponse =
+            await groupBuyingService.getGroupBuyingById(groupBuyId)
+          const updatedData =
+            (updatedResponse as any)?.data?.data ||
+            (updatedResponse as any)?.data ||
+            updatedResponse
+          setGroupBuy(updatedData)
+        } catch (joinErr: any) {
+          console.error('Join error:', joinErr)
+          throw new Error(
+            joinErr?.message || 'Không thể tham gia nhóm mua chung'
+          )
+        }
+      } else {
+        console.log('User already joined this group')
+        setHasJoined(true)
+      }
     } catch (err: any) {
-      console.error('Error fetching group buy:', err)
+      console.error('Error initializing checkout:', err)
       const errorMessage =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Không thể tải thông tin nhóm mua chung'
+        err?.message || 'Không thể tải thông tin nhóm mua chung'
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -57,6 +115,17 @@ export default function GroupBuyingCheckoutPage() {
     try {
       setProcessing(true)
       setError(null)
+
+      console.log('Starting checkout with groupBuyId:', groupBuyId)
+
+      // Kiểm tra token
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        setError('Vui lòng đăng nhập để tiếp tục')
+        router.push('/auth')
+        return
+      }
+      console.log('Token exists:', token ? 'Yes' : 'No')
 
       // Gọi API checkout - mỗi người thanh toán riêng
       const response = await orderService.checkoutGroupBuy({
@@ -91,8 +160,27 @@ export default function GroupBuyingCheckoutPage() {
         router.push(`/group-buying`)
       }
     } catch (err: any) {
-      console.error('Checkout error:', err)
-      setError(err.message || 'Có lỗi xảy ra khi thanh toán')
+      console.error('Checkout error (full):', err)
+      console.error('Error type:', typeof err)
+      console.error('Error keys:', Object.keys(err || {}))
+      console.error('Error message:', err?.message)
+      console.error('Error response:', err?.response)
+      console.error('Error status:', err?.status)
+
+      let errorMessage = 'Có lỗi xảy ra khi thanh toán'
+
+      if (err?.status === 401) {
+        errorMessage = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại'
+        setTimeout(() => router.push('/auth'), 2000)
+      } else if (err?.status === 404) {
+        errorMessage = 'Không tìm thấy API endpoint. Vui lòng kiểm tra backend'
+      } else if (err?.status === 400) {
+        errorMessage = err?.message || 'Thông tin không hợp lệ'
+      } else if (err?.message) {
+        errorMessage = err.message
+      }
+
+      setError(errorMessage)
     } finally {
       setProcessing(false)
     }
@@ -100,8 +188,11 @@ export default function GroupBuyingCheckoutPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <LoadingSpinner />
+        <p className="text-gray-600">
+          {hasJoined ? 'Đang tải thông tin...' : 'Đang tham gia nhóm mua...'}
+        </p>
       </div>
     )
   }
@@ -128,17 +219,45 @@ export default function GroupBuyingCheckoutPage() {
     groupBuy.product?.price ||
     currentPrice
 
-  const discount = originalPrice - currentPrice
+  // Tính discount an toàn
+  const discount = Math.max(0, originalPrice - currentPrice)
   const discountPercent =
-    originalPrice > 0 ? Math.round((discount / originalPrice) * 100) : 0
+    originalPrice > 0 && discount > 0
+      ? Math.round((discount / originalPrice) * 100)
+      : 0
 
   // Tính số người: backend đã tính sẵn người tạo trong currentQuantity
-  const targetPeople = groupBuy.targetQuantity || groupBuy.maxParticipants || 10
-  const currentPeople =
+  const targetPeople = Number(
+    groupBuy.targetQuantity || groupBuy.maxParticipants || 10
+  )
+  const participantsValue = Array.isArray(groupBuy.participants)
+    ? groupBuy.participants.length
+    : typeof groupBuy.participants === 'number'
+      ? groupBuy.participants
+      : 0
+  const currentPeople = Number(
     groupBuy.currentQuantity ||
-    groupBuy.currentParticipants ||
-    groupBuy.participants ||
-    0
+      groupBuy.currentParticipants ||
+      participantsValue ||
+      0
+  )
+
+  // Validate and get safe image URL
+  const getImageUrl = () => {
+    const image = groupBuy.product?.image || groupBuy.image
+    if (!image) return '/images/placeholder.png'
+
+    // Check if it's a valid absolute URL
+    try {
+      new URL(image)
+      return image
+    } catch {
+      // If not a valid URL, check if it's a local path
+      if (image.startsWith('/')) return image
+      // Otherwise use placeholder
+      return '/images/placeholder.png'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -168,11 +287,7 @@ export default function GroupBuyingCheckoutPage() {
               <div className="flex gap-4">
                 <div className="relative w-24 h-24 flex-shrink-0">
                   <Image
-                    src={
-                      groupBuy.product?.image ||
-                      groupBuy.image ||
-                      '/images/placeholder.png'
-                    }
+                    src={getImageUrl()}
                     alt={groupBuy.product?.name || groupBuy.title || 'Product'}
                     fill
                     className="object-cover rounded-lg"
