@@ -2,11 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Button } from './ui/Button'
 
 export const Header: React.FC = () => {
   const router = useRouter()
+  const pathname = usePathname()
   const [isAuthed, setIsAuthed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -173,19 +174,39 @@ export const Header: React.FC = () => {
           <nav className="flex items-center space-x-6">
             <Link
               href="/"
-              className="text-green-600 font-medium hover:text-green-700"
+              className={`font-medium hover:text-green-700 ${
+                pathname === '/' ? 'text-green-600' : 'text-gray-600'
+              }`}
             >
               Trang chủ
             </Link>
-            <Link href="/about" className="text-gray-600 hover:text-gray-900">
+            <Link
+              href="/about"
+              className={`hover:text-gray-900 ${
+                pathname?.startsWith('/about')
+                  ? 'text-green-600 font-medium'
+                  : 'text-gray-600'
+              }`}
+            >
               Giới thiệu
             </Link>
-            <Link href="/forum" className="text-gray-600 hover:text-gray-900">
+            <Link
+              href="/forum"
+              className={`hover:text-gray-900 ${
+                pathname?.startsWith('/forum')
+                  ? 'text-green-600 font-medium'
+                  : 'text-gray-600'
+              }`}
+            >
               Forum
             </Link>
             <Link
               href="/group-buying"
-              className="text-gray-600 hover:text-gray-900"
+              className={`hover:text-gray-900 ${
+                pathname?.startsWith('/group-buying')
+                  ? 'text-green-600 font-medium'
+                  : 'text-gray-600'
+              }`}
             >
               Mua chung
             </Link>

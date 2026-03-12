@@ -15,6 +15,8 @@ class ApiClient {
     config: RequestConfig = {}
   ): Promise<T> {
     const { method = 'GET', headers = {}, body, params } = config
+    const isFormData =
+      typeof FormData !== 'undefined' && body instanceof FormData
 
     // Build URL with query params
     const url = new URL(endpoint, this.baseURL)
@@ -25,9 +27,12 @@ class ApiClient {
     }
 
     // Default headers
-    const defaultHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
+    // - With FormData: let browser set multipart boundary automatically
+    const defaultHeaders: Record<string, string> = isFormData
+      ? {}
+      : {
+          'Content-Type': 'application/json',
+        }
 
     // Merge headers
     const mergedHeaders: Record<string, string> = { ...defaultHeaders, ...headers }
@@ -55,38 +60,56 @@ class ApiClient {
 
     // Add body for non-GET requests
     if (body && method !== 'GET') {
-      fetchOptions.body = JSON.stringify(body)
+      fetchOptions.body = isFormData ? (body as FormData) : JSON.stringify(body)
     }
 
     try {
       const response = await fetch(url.toString(), fetchOptions)
 
-      if (!response.ok) {
-        const error: ApiError = {
-          message: `HTTP error! status: ${response.status}`,
-          status: response.status,
-        }
+      const contentType = response.headers.get('content-type') || ''
+      const isJson = contentType.includes('application/json')
 
+      const parseBody = async () => {
+        if (response.status === 204) return null
+        if (isJson) {
+          try {
+            return await response.json()
+          } catch {
+            return null
+          }
+        }
         try {
-          const errorData = await response.json()
-          error.message = errorData.message || error.message
-          error.code = errorData.code
+          return await response.text()
         } catch {
-          // If response is not JSON, use default error
+          return null
         }
+      }
 
+      const data = await parseBody()
+
+      if (!response.ok) {
+        const errObj = (data && typeof data === 'object') ? (data as any) : null
+        const error: ApiError = {
+          status: response.status,
+          message:
+            (errObj?.message as string) ||
+            (typeof data === 'string' ? data : '') ||
+            `HTTP error! status: ${response.status}`,
+          code: errObj?.code,
+          details: data,
+        }
         throw error
       }
 
-      const data = await response.json()
       return data as T
     } catch (error) {
-      if (error instanceof Error) {
-        throw {
-          message: error.message,
-        } as ApiError
+      if (error && typeof error === 'object' && 'message' in (error as any)) {
+        throw error as ApiError
       }
-      throw error
+      if (error instanceof Error) {
+        throw { message: error.message } as ApiError
+      }
+      throw { message: 'Có lỗi xảy ra' } as ApiError
     }
   }
 
