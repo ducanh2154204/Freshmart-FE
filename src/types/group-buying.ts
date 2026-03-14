@@ -51,6 +51,16 @@ export interface CreateGroupBuyingPayload {
   }
 }
 
+export interface JoinGroupBuyingPayload {
+  groupBuyId: number | string
+  quantity: number
+  deliveryDetail: {
+    name: string
+    phone: string
+    address: string
+  }
+}
+
 export interface GroupBuyingListParams {
   page?: number
   limit?: number

@@ -75,32 +75,37 @@ export default function GroupBuyingCheckoutPage() {
       console.log('Already joined:', isAlreadyJoined)
 
       if (!isAlreadyJoined) {
-        // Chưa join → gọi API join
-        console.log('User has not joined yet, calling join API...')
-        try {
-          const joinResponse =
-            await groupBuyingService.joinGroupBuying(groupBuyId)
-          console.log('Join response:', joinResponse)
-          setHasJoined(true)
-
-          // Refresh group buy data sau khi join
-          const updatedResponse =
-            await groupBuyingService.getGroupBuyingById(groupBuyId)
-          const updatedData =
-            (updatedResponse as any)?.data?.data ||
-            (updatedResponse as any)?.data ||
-            updatedResponse
-          setGroupBuy(updatedData)
-        } catch (joinErr: any) {
-          console.error('Join error:', joinErr)
-          throw new Error(
-            joinErr?.message || 'Không thể tham gia nhóm mua chung'
-          )
-        }
-      } else {
-        console.log('User already joined this group')
-        setHasJoined(true)
+        // Chưa join → không cho thanh toán, quay lại trang chi tiết
+        setHasJoined(false)
+        setError('Bạn cần tham gia nhóm trước khi thanh toán')
+        router.push(`/group-buying/${groupBuyId}`)
+        return
       }
+
+      // Kiểm tra đủ số lượng người để được thanh toán
+      const targetPeople = Number(
+        groupBuyData.targetQuantity || groupBuyData.maxParticipants || 10
+      )
+      const participantsValue = Array.isArray(groupBuyData.participants)
+        ? groupBuyData.participants.length
+        : typeof groupBuyData.participants === 'number'
+          ? groupBuyData.participants
+          : 0
+      const currentPeople = Number(
+        groupBuyData.currentQuantity ||
+          groupBuyData.currentParticipants ||
+          participantsValue ||
+          0
+      )
+
+      if (currentPeople < targetPeople) {
+        setError('Nhóm chưa đủ số lượng, chưa thể thanh toán')
+        router.push(`/group-buying/${groupBuyId}`)
+        return
+      }
+
+      console.log('User already joined this group và nhóm đã đủ người')
+      setHasJoined(true)
     } catch (err: any) {
       console.error('Error initializing checkout:', err)
       const errorMessage =

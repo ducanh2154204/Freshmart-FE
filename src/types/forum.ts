@@ -34,10 +34,23 @@ export interface ForumPost {
   status?: 'open' | 'full' | 'closed'
 }
 
+export interface ForumPostMetadata {
+  title?: string
+  productName?: string
+  location?: string
+  minMembers?: number
+  priceNote?: string
+}
+
 export interface CreateForumPostPayload {
   content: string
   images?: File[]
   groupBuyId?: number | string
+  title?: string
+  productName?: string
+  location?: string
+  minMembers?: number
+  priceNote?: string
 }
 
 export interface ForumComment {
@@ -74,4 +87,3 @@ export interface ToggleLikeResponse {
 export interface DeletePostResponse {
   message: string
 }
-
