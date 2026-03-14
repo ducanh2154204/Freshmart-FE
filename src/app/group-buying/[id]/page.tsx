@@ -7,8 +7,10 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { groupBuyingService } from '@/services/group-buying.service'
 import type { GroupBuying } from '@/types'
-import { Button } from '@/components/ui'
+import { Button, Input } from '@/components/ui'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { GroupBuyChat } from '@/components/GroupBuyChat'
+import { toast } from 'react-toastify'
 
 // Helper to calculate time remaining
 const calculateTimeRemaining = (endTime: string) => {
@@ -38,6 +40,16 @@ export default function GroupBuyingDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [joinForm, setJoinForm] = useState({
+    name: '',
+    phone: '',
+    address: '',
+  })
+  const [joinErrors, setJoinErrors] = useState<{
+    name?: string
+    phone?: string
+    address?: string
+  }>({})
   const [timeRemaining, setTimeRemaining] = useState({
     days: 0,
     hours: 0,
@@ -47,7 +59,15 @@ export default function GroupBuyingDetailPage() {
   })
 
   useEffect(() => {
-    fetchGroupBuyDetails()
+    fetchGroupBuyDetails().then(gb => {
+      if (!gb) return
+      const delivery = gb.deliveryDetail
+      setJoinForm(prev => ({
+        name: delivery?.name || gb.recipientName || prev.name,
+        phone: delivery?.phone || prev.phone,
+        address: delivery?.address || gb.deliveryAddress || prev.address,
+      }))
+    })
     // Lấy userId hiện tại từ localStorage
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('accessToken')
@@ -79,7 +99,7 @@ export default function GroupBuyingDetailPage() {
     return () => clearInterval(interval)
   }, [groupBuy?.endTime])
 
-  const fetchGroupBuyDetails = async () => {
+  const fetchGroupBuyDetails = async (): Promise<GroupBuying | null> => {
     try {
       setLoading(true)
       setError(null)
@@ -96,11 +116,12 @@ export default function GroupBuyingDetailPage() {
         groupBuyData = response as GroupBuying
       }
 
-      if (groupBuyData && groupBuyData.id) {
-        setGroupBuy(groupBuyData)
-      } else {
+      if (!groupBuyData || !groupBuyData.id) {
         throw new Error(`Không tìm thấy nhóm mua chung với ID ${groupBuyId}`)
       }
+
+      setGroupBuy(groupBuyData)
+      return groupBuyData
     } catch (err: any) {
       console.error('Error fetching group buy:', err)
       const errorMessage =
@@ -108,29 +129,108 @@ export default function GroupBuyingDetailPage() {
         err?.message ||
         'Không thể tải thông tin nhóm mua chung'
       setError(errorMessage)
+      return null
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCheckout = () => {
-    // Kiểm tra xem user đã đăng nhập chưa
+  const requireAuth = (nextPath: string) => {
     const token =
       typeof window !== 'undefined'
         ? window.localStorage.getItem('accessToken')
         : null
 
     if (!token) {
-      // Chưa đăng nhập → redirect về trang auth
-      // Lưu returnUrl để sau khi login xong quay lại
-      const returnUrl = encodeURIComponent(
-        `/group-buying/${groupBuyId}/checkout`
-      )
+      const returnUrl = encodeURIComponent(nextPath)
       router.push(`/auth?returnUrl=${returnUrl}`)
-      return
+      return false
     }
 
-    // Đã đăng nhập → chuyển sang trang checkout
+    return true
+  }
+
+  // Join group (không thanh toán)
+  const handleJoinGroup = async () => {
+    if (!groupBuy) return
+
+    const ok = requireAuth(`/group-buying/${groupBuyId}`)
+    if (!ok) return
+
+    try {
+      setJoinErrors({})
+      const nextErrors: typeof joinErrors = {}
+      if (!joinForm.name.trim()) nextErrors.name = 'Vui lòng nhập tên'
+      if (!joinForm.phone.trim()) nextErrors.phone = 'Vui lòng nhập SĐT'
+      if (!joinForm.address.trim())
+        nextErrors.address = 'Vui lòng nhập địa chỉ'
+
+      if (Object.keys(nextErrors).length > 0) {
+        setJoinErrors(nextErrors)
+        toast.error('Vui lòng điền đầy đủ thông tin nhận hàng để tham gia nhóm')
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      await groupBuyingService.joinGroupBuying({
+        groupBuyId: Number(groupBuyId),
+        quantity,
+        deliveryDetail: {
+          name: joinForm.name.trim(),
+          phone: joinForm.phone.trim(),
+          address: joinForm.address.trim(),
+        },
+      })
+
+      const updated = await fetchGroupBuyDetails()
+
+      toast.success('Tham gia nhóm thành công!')
+
+      if (updated) {
+        const targetPeople = Number(
+          updated.targetQuantity || updated.maxParticipants || 10
+        )
+        const participantsValue = Array.isArray(updated.participants)
+          ? updated.participants.length
+          : typeof updated.participants === 'number'
+            ? updated.participants
+            : 0
+        const currentPeople = Number(
+          updated.currentQuantity ||
+            updated.currentParticipants ||
+            participantsValue ||
+            0
+        )
+
+        // Nếu sau khi join mà nhóm đã đủ người thì đưa user sang bước thanh toán
+        if (currentPeople >= targetPeople) {
+          toast.info('Nhóm đã đủ người, chuyển sang bước thanh toán.')
+          router.push(`/group-buying/${groupBuyId}/checkout`)
+        }
+      }
+    } catch (err: any) {
+      console.error('Join group error:', err, {
+        keys: err ? Object.keys(err) : [],
+      })
+      const message =
+        err?.details?.message ||
+        err?.message ||
+        err?.message ||
+        'Không thể tham gia nhóm, vui lòng thử lại'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Chỉ dùng cho bước thanh toán (khi đã join & đủ người)
+  const handleCheckout = () => {
+    const ok = requireAuth(`/group-buying/${groupBuyId}/checkout`)
+    if (!ok) return
+
     router.push(`/group-buying/${groupBuyId}/checkout`)
   }
 
@@ -143,8 +243,18 @@ export default function GroupBuyingDetailPage() {
     return creatorId === String(currentUserId)
   }
 
+  // Kiểm tra xem user đã join nhóm (không quan tâm đã thanh toán hay chưa)
+  const isJoined = () => {
+    if (!currentUserId || !groupBuy) return false
+    if (!Array.isArray(groupBuy.participants)) return false
+
+    return groupBuy.participants.some(
+      (p: any) => String(p.userId || p.id) === String(currentUserId)
+    )
+  }
+
   // Kiểm tra xem user đã tham gia nhóm chưa (và đã thanh toán)
-  const isParticipant = () => {
+  const hasPaid = () => {
     if (!currentUserId || !groupBuy) return false
     if (Array.isArray(groupBuy.participants)) {
       const participant = groupBuy.participants.find(
@@ -245,6 +355,11 @@ export default function GroupBuyingDetailPage() {
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`
 
+  const joined = isJoined()
+  const paid = hasPaid()
+  const isFull = currentPeople >= targetPeople
+  const canCheckout = joined && isFull && !timeRemaining.expired
+
   // Validate and get safe image URL
   const getImageUrl = () => {
     const image = groupBuy.product?.image || groupBuy.image
@@ -279,7 +394,7 @@ export default function GroupBuyingDetailPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr,3fr,2fr] gap-8">
               {/* Left Side - Image */}
               <div className="space-y-4">
                 <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
@@ -311,7 +426,7 @@ export default function GroupBuyingDetailPage() {
                 </div>
               </div>
 
-              {/* Right Side - Details */}
+              {/* Middle - Details */}
               <div className="space-y-4">
                 <h1 className="text-2xl font-bold text-gray-900">
                   {groupBuy.product?.name || groupBuy.title}
@@ -471,11 +586,11 @@ export default function GroupBuyingDetailPage() {
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {isParticipant() ? (
-                    // Đã tham gia nhóm (đã thanh toán)
+                  {paid ? (
+                    // Đã thanh toán
                     <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4 text-center">
                       <p className="text-green-700 font-semibold mb-2">
-                        ✓ Bạn đã tham gia nhóm này
+                        ✓ Bạn đã thanh toán cho nhóm này
                       </p>
                       <Button
                         onClick={() => router.push('/profile')}
@@ -484,40 +599,93 @@ export default function GroupBuyingDetailPage() {
                         Xem đơn hàng của tôi
                       </Button>
                     </div>
-                  ) : (
-                    // Chưa thanh toán - hiển thị nút thanh toán (cả chủ nhóm và người khác)
+                  ) : !joined ? (
+                    // Chưa join nhóm → tham gia nhóm (chưa thanh toán)
                     <>
-                      {isGroupOwner() && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                          <p className="text-blue-700 text-sm font-medium text-center">
-                            💡 Bạn là chủ nhóm. Vui lòng thanh toán để hoàn tất
-                            tạo nhóm
-                          </p>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                        <div className="text-sm font-semibold text-gray-900">
+                          Thông tin nhận hàng
                         </div>
-                      )}
-
+                        <div className="grid grid-cols-1 gap-3">
+                          <Input
+                            label="Họ và tên"
+                            value={joinForm.name}
+                            onChange={e =>
+                              setJoinForm(prev => ({
+                                ...prev,
+                                name: e.target.value,
+                              }))
+                            }
+                            error={joinErrors.name}
+                            placeholder="Nhập họ và tên"
+                          />
+                          <Input
+                            label="Số điện thoại"
+                            value={joinForm.phone}
+                            onChange={e =>
+                              setJoinForm(prev => ({
+                                ...prev,
+                                phone: e.target.value,
+                              }))
+                            }
+                            error={joinErrors.phone}
+                            placeholder="Nhập số điện thoại"
+                          />
+                          <Input
+                            label="Địa chỉ"
+                            value={joinForm.address}
+                            onChange={e =>
+                              setJoinForm(prev => ({
+                                ...prev,
+                                address: e.target.value,
+                              }))
+                            }
+                            error={joinErrors.address}
+                            placeholder="Nhập địa chỉ nhận hàng"
+                          />
+                        </div>
+                      </div>
                       <Button
-                        onClick={handleCheckout}
+                        onClick={handleJoinGroup}
                         disabled={timeRemaining.expired}
                         className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg font-bold text-lg disabled:bg-gray-400"
                       >
                         {!currentUserId
-                          ? 'Đăng Nhập để Tham Gia'
-                          : isGroupOwner()
-                            ? 'Thanh Toán & Hoàn Tất Tạo Nhóm'
-                            : 'Tham Gia Nhóm & Thanh Toán'}
+                          ? 'Đăng nhập để tham gia nhóm'
+                          : 'Tham gia nhóm'}
                       </Button>
-
-                      <div className="text-xs text-center text-gray-500">
-                        Bằng việc {isGroupOwner() ? 'thanh toán' : 'tham gia'},
-                        bạn đồng ý với{' '}
-                        <a href="#" className="text-green-600 hover:underline">
-                          Điều khoản sử dụng
-                        </a>
+                      <p className="text-xs text-center text-gray-500">
+                        Bạn chỉ thanh toán khi nhóm đủ số lượng và được áp dụng
+                        giá cuối.
+                      </p>
+                    </>
+                  ) : (
+                    // Đã join nhóm, chờ đủ người để thanh toán
+                    <>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2 text-center text-sm text-blue-800">
+                        {isFull
+                          ? 'Nhóm đã đủ người, bạn có thể tiến hành thanh toán với giá cuối.'
+                          : `Bạn đã tham gia nhóm. Chờ thêm ${
+                              targetPeople - currentPeople
+                            } người để mở thanh toán giá cuối.`}
                       </div>
+
+                      <Button
+                        onClick={handleCheckout}
+                        disabled={!canCheckout}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg font-bold text-lg disabled:bg-gray-400"
+                      >
+                        {canCheckout
+                          ? 'Thanh toán giá cuối'
+                          : 'Chờ đủ người để thanh toán'}
+                      </Button>
                     </>
                   )}
                 </div>
+              </div>
+              {/* Right Side - Group Chat */}
+              <div className="flex flex-col">
+                <GroupBuyChat groupBuyId={groupBuy.id} />
               </div>
             </div>
           </div>

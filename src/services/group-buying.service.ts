@@ -5,6 +5,7 @@ import type {
   CreateGroupBuyingPayload,
   GroupBuyingListParams,
   GroupBuyingListResponse,
+  JoinGroupBuyingPayload,
 } from '@/types/group-buying'
 
 export const groupBuyingService = {
@@ -61,11 +62,27 @@ export const groupBuyingService = {
 
   /**
    * Tham gia group buying
+   * Backend hiện yêu cầu body:
+   * { groupBuyId, quantity, deliveryDetail: { name, phone, address } }
    */
-  joinGroupBuying(groupBuyId: number | string) {
-    return apiClient.post<BaseResponse<GroupBuying>>('/api/group-buys/join', {
-      groupBuyId,
-    })
+  joinGroupBuying(payload: JoinGroupBuyingPayload | number | string) {
+    const body: JoinGroupBuyingPayload =
+      typeof payload === 'object'
+        ? (payload as JoinGroupBuyingPayload)
+        : {
+            groupBuyId: payload,
+            quantity: 1,
+            deliveryDetail: {
+              name: '',
+              phone: '',
+              address: '',
+            },
+          }
+
+    return apiClient.post<BaseResponse<GroupBuying>>(
+      '/api/group-buys/join',
+      body
+    )
   },
 
   /**

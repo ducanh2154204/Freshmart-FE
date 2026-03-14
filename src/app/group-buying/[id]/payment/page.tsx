@@ -95,7 +95,7 @@ export default function PaymentPage() {
     try {
       setPolling(true)
       setPollingTimeout(false)
-      const maxTime = 200 // 10 phút
+      const maxTime = 300 // 15 phút (mỗi bước 3s)
       setCountdown(maxTime)
 
       // Countdown timer
@@ -130,7 +130,7 @@ export default function PaymentPage() {
           }
         },
         3000, // Poll mỗi 3 giây
-        200 // Tối đa 10 phút (tăng từ 3 phút)
+        300 // Tối đa 15 phút
       )
       clearInterval(countdownInterval)
     } catch (err: any) {
