@@ -1,7 +1,6 @@
 import { Header } from '@/components/Header'
 import { HeroSection } from '@/components/HeroSection'
-import { CategoriesSection } from '@/components/CategoriesSection'
-import { ProductsSection } from '@/components/ProductsSection'
+import { GuideCard } from '@/components/GuideCard'
 import { GroupBuyingBanner } from '@/components/GroupBuyingBanner'
 import { Footer } from '@/components/Footer'
 
@@ -11,8 +10,7 @@ export default function HomePage() {
       <Header />
       <main>
         <HeroSection />
-        <CategoriesSection />
-        <ProductsSection />
+        <GuideCard />
         <GroupBuyingBanner />
       </main>
       <Footer />

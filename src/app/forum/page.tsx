@@ -222,7 +222,11 @@ const ForumPage: React.FC = () => {
         const mapped = (res.posts || []).map(mapApiPostToUI)
         setPosts(mapped)
       } catch (err) {
-        console.error('Error fetching forum posts:', err)
+        const errorMsg =
+          err instanceof Error
+            ? err.message
+            : (err as any)?.message || 'Lỗi không xác định'
+        console.error('Error fetching forum posts:', errorMsg, err)
         setError('Không thể tải bài viết. Vui lòng thử lại sau.')
       } finally {
         setLoading(false)
@@ -296,8 +300,8 @@ const ForumPage: React.FC = () => {
       })
       setImages([])
     } catch (err) {
-      console.error('Error creating forum post:', err)
       const msg = getErrorMessage(err, 'Đăng bài thất bại')
+      console.error('Error creating forum post:', msg, err)
       toast.error(msg)
       setError(msg)
     } finally {
@@ -328,8 +332,12 @@ const ForumPage: React.FC = () => {
         )
       )
     } catch (err) {
-      console.error('Error toggling like:', err)
-      toast.error(getErrorMessage(err, 'Không thể thực hiện thao tác like'))
+      const likeError = getErrorMessage(
+        err,
+        'Không thể thực hiện thao tác like'
+      )
+      console.error('Error toggling like:', likeError, err)
+      toast.error(likeError)
       // Revert optimistic update if needed
       setPosts(prev =>
         prev.map(p =>
@@ -360,8 +368,9 @@ const ForumPage: React.FC = () => {
       setPosts(prev => prev.filter(p => p.id !== postId))
       toast.success('Đã xóa bài viết')
     } catch (err) {
-      console.error('Error deleting post:', err)
-      toast.error(getErrorMessage(err, 'Xóa bài viết thất bại'))
+      const deleteError = getErrorMessage(err, 'Xóa bài viết thất bại')
+      console.error('Error deleting post:', deleteError, err)
+      toast.error(deleteError)
     }
   }
 
@@ -424,8 +433,9 @@ const ForumPage: React.FC = () => {
         )
       )
     } catch (err) {
-      console.error('Error loading comments:', err)
-      toast.error(getErrorMessage(err, 'Không thể tải bình luận'))
+      const commentError = getErrorMessage(err, 'Không thể tải bình luận')
+      console.error('Error loading comments:', commentError, err)
+      toast.error(commentError)
     } finally {
       setCommentsLoading(prev => ({ ...prev, [postId]: false }))
     }
@@ -450,8 +460,9 @@ const ForumPage: React.FC = () => {
       )
       setNewComment(prev => ({ ...prev, [postId]: '' }))
     } catch (err) {
-      console.error('Error adding comment:', err)
-      toast.error(getErrorMessage(err, 'Gửi bình luận thất bại'))
+      const addCommentError = getErrorMessage(err, 'Gửi bình luận thất bại')
+      console.error('Error adding comment:', addCommentError, err)
+      toast.error(addCommentError)
     }
   }
 
