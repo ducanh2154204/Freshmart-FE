@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { productService } from '@/services/product.service'
@@ -22,7 +23,6 @@ export default function CreateGroupPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -36,7 +36,13 @@ export default function CreateGroupPage() {
         setProducts(productsList)
       } catch (err) {
         console.error('Error fetching products:', err)
-        setError('Không thể tải danh sách sản phẩm')
+        const apiError = err as Partial<ApiError> & { details?: any }
+        const message =
+          (typeof apiError?.message === 'string' && apiError.message) ||
+          (typeof apiError?.details?.message === 'string' &&
+            apiError.details.message) ||
+          'Không thể tải danh sách sản phẩm'
+        toast.error(message)
       } finally {
         setLoading(false)
       }
@@ -75,18 +81,17 @@ export default function CreateGroupPage() {
       !recipientPhone ||
       !deliveryAddress
     ) {
-      setError('Vui lòng điền đầy đủ thông tin')
+      toast.error('Vui lòng điền đầy đủ thông tin')
       return
     }
 
     if (!maxPeople || !duration) {
-      setError('Vui lòng chọn số người và thời gian')
+      toast.error('Vui lòng chọn số người và thời gian')
       return
     }
 
     try {
       setSubmitting(true)
-      setError(null)
 
       // Calculate times
       const now = new Date()
@@ -117,16 +122,21 @@ export default function CreateGroupPage() {
 
       // Redirect về trang detail của nhóm vừa tạo để thanh toán
       if (groupBuyId) {
+        toast.success('Tạo nhóm mua chung thành công!')
         router.push(`/group-buying/${groupBuyId}`)
       } else {
         // Fallback nếu không lấy được ID
+        toast.success('Tạo nhóm mua chung thành công!')
         router.push('/group-buying')
       }
     } catch (err) {
-      const apiError = err as ApiError
-      setError(
-        apiError?.message || 'Không thể tạo nhóm mua chung. Vui lòng thử lại.'
-      )
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Không thể tạo nhóm mua chung. Vui lòng thử lại.'
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -437,12 +447,6 @@ export default function CreateGroupPage() {
                   </span>
                 </div>
               </div>
-
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                  {error}
-                </div>
-              )}
 
               <button
                 onClick={handleCreateGroup}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
+import { toast } from 'react-toastify'
 import { groupBuyingService } from '@/services/group-buying.service'
 import { orderService } from '@/services/order.service'
 import type { GroupBuying, Order, OrderStatusResponse } from '@/types'
@@ -17,7 +18,6 @@ export default function GroupBuyingCheckoutPage() {
   const [groupBuy, setGroupBuy] = useState<GroupBuying | null>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'ONLINE'>('COD')
   const [hasJoined, setHasJoined] = useState(false)
 
@@ -28,12 +28,11 @@ export default function GroupBuyingCheckoutPage() {
   const initCheckout = async () => {
     try {
       setLoading(true)
-      setError(null)
 
       // Kiểm tra đăng nhập
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        setError('Vui lòng đăng nhập để tiếp tục')
+        toast.error('Đăng nhập vui lòng đăng nhập để tiếp tục')
         router.push('/auth')
         return
       }
@@ -77,7 +76,7 @@ export default function GroupBuyingCheckoutPage() {
       if (!isAlreadyJoined) {
         // Chưa join → không cho thanh toán, quay lại trang chi tiết
         setHasJoined(false)
-        setError('Bạn cần tham gia nhóm trước khi thanh toán')
+        toast.error('Bạn cần tham gia nhóm trước khi thanh toán')
         router.push(`/group-buying/${groupBuyId}`)
         return
       }
@@ -99,7 +98,7 @@ export default function GroupBuyingCheckoutPage() {
       )
 
       if (currentPeople < targetPeople) {
-        setError('Nhóm chưa đủ số lượng, chưa thể thanh toán')
+        toast.error('Nhóm chưa đủ số lượng, chưa thể thanh toán')
         router.push(`/group-buying/${groupBuyId}`)
         return
       }
@@ -110,7 +109,7 @@ export default function GroupBuyingCheckoutPage() {
       console.error('Error initializing checkout:', err)
       const errorMessage =
         err?.message || 'Không thể tải thông tin nhóm mua chung'
-      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -119,14 +118,13 @@ export default function GroupBuyingCheckoutPage() {
   const handleCheckout = async () => {
     try {
       setProcessing(true)
-      setError(null)
 
       console.log('Starting checkout with groupBuyId:', groupBuyId)
 
       // Kiểm tra token
       const token = localStorage.getItem('accessToken')
       if (!token) {
-        setError('Vui lòng đăng nhập để tiếp tục')
+        toast.error('Đăng nhập vui lòng đăng nhập để tiếp tục')
         router.push('/auth')
         return
       }
@@ -157,7 +155,7 @@ export default function GroupBuyingCheckoutPage() {
           )
         } else {
           console.error('No order ID found in response')
-          setError('Không tìm thấy mã đơn hàng')
+          toast.error('Không tìm thấy mã đơn hàng')
         }
       } else {
         // COD - thanh toán khi nhận hàng
@@ -185,7 +183,7 @@ export default function GroupBuyingCheckoutPage() {
         errorMessage = err.message
       }
 
-      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setProcessing(false)
     }
@@ -198,14 +196,6 @@ export default function GroupBuyingCheckoutPage() {
         <p className="text-gray-600">
           {hasJoined ? 'Đang tải thông tin...' : 'Đang tham gia nhóm mua...'}
         </p>
-      </div>
-    )
-  }
-
-  if (error && !groupBuy) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-500">{error}</div>
       </div>
     )
   }
@@ -433,12 +423,6 @@ export default function GroupBuyingCheckoutPage() {
                 <div className="text-xs text-gray-500 mb-4 flex items-start gap-2">
                   <span>⏱</span>
                   <span>{groupBuy.deliveryInfo}</span>
-                </div>
-              )}
-
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded">
-                  {error}
                 </div>
               )}
 

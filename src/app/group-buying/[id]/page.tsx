@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
+import { toast } from 'react-toastify'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { groupBuyingService } from '@/services/group-buying.service'
@@ -10,7 +11,6 @@ import type { GroupBuying } from '@/types'
 import { Button, Input } from '@/components/ui'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { GroupBuyChat } from '@/components/GroupBuyChat'
-import { toast } from 'react-toastify'
 
 // Helper to calculate time remaining
 const calculateTimeRemaining = (endTime: string) => {
@@ -37,7 +37,6 @@ export default function GroupBuyingDetailPage() {
 
   const [groupBuy, setGroupBuy] = useState<GroupBuying | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [joinForm, setJoinForm] = useState({
@@ -102,7 +101,6 @@ export default function GroupBuyingDetailPage() {
   const fetchGroupBuyDetails = async (): Promise<GroupBuying | null> => {
     try {
       setLoading(true)
-      setError(null)
 
       // Dùng API GET /group-buys/{id}
       const response = await groupBuyingService.getGroupBuyingById(groupBuyId)
@@ -128,7 +126,7 @@ export default function GroupBuyingDetailPage() {
         err?.response?.data?.message ||
         err?.message ||
         'Không thể tải thông tin nhóm mua chung'
-      setError(errorMessage)
+      toast.error(errorMessage)
       return null
     } finally {
       setLoading(false)
@@ -162,8 +160,7 @@ export default function GroupBuyingDetailPage() {
       const nextErrors: typeof joinErrors = {}
       if (!joinForm.name.trim()) nextErrors.name = 'Vui lòng nhập tên'
       if (!joinForm.phone.trim()) nextErrors.phone = 'Vui lòng nhập SĐT'
-      if (!joinForm.address.trim())
-        nextErrors.address = 'Vui lòng nhập địa chỉ'
+      if (!joinForm.address.trim()) nextErrors.address = 'Vui lòng nhập địa chỉ'
 
       if (Object.keys(nextErrors).length > 0) {
         setJoinErrors(nextErrors)
@@ -172,7 +169,6 @@ export default function GroupBuyingDetailPage() {
       }
 
       setLoading(true)
-      setError(null)
 
       await groupBuyingService.joinGroupBuying({
         groupBuyId: Number(groupBuyId),
@@ -219,7 +215,6 @@ export default function GroupBuyingDetailPage() {
         err?.message ||
         err?.message ||
         'Không thể tham gia nhóm, vui lòng thử lại'
-      setError(message)
       toast.error(message)
     } finally {
       setLoading(false)
@@ -291,15 +286,13 @@ export default function GroupBuyingDetailPage() {
     )
   }
 
-  if (error || !groupBuy) {
+  if (!groupBuy) {
     return (
       <>
         <Header />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
-            <p className="text-red-500 mb-4">
-              {error || 'Không tìm thấy nhóm mua chung'}
-            </p>
+            <p className="text-red-500 mb-4">Không tìm thấy nhóm mua chung</p>
             <Button onClick={() => router.push('/group-buying')}>
               Quay lại danh sách
             </Button>

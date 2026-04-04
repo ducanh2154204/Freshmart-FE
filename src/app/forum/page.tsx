@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'react-toastify'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Header } from '@/components/Header'
@@ -12,8 +13,6 @@ import type {
   ForumPostsResponse,
 } from '@/types/forum'
 import type { ApiError } from '@/types/api'
-import { ToastContainer, toast } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 import { useConfirm } from '@/components/ui/confirm'
 
 type JoinStatus = 'open' | 'full' | 'closed'
@@ -68,7 +67,6 @@ const ForumPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [commentsByPost, setCommentsByPost] = useState<
     Record<string | number, ForumComment[]>
   >({})
@@ -171,15 +169,6 @@ const ForumPage: React.FC = () => {
     }
   }
 
-  const getErrorMessage = (err: unknown, fallback: string) => {
-    const e = err as Partial<ApiError> | any
-    return (
-      (typeof e?.message === 'string' && e.message) ||
-      (typeof e?.details?.message === 'string' && e.details.message) ||
-      fallback
-    )
-  }
-
   const validateBeforeCreate = () => {
     const content = form.content.trim()
     if (!content) return 'Vui lòng nhập nội dung bài viết'
@@ -212,7 +201,6 @@ const ForumPage: React.FC = () => {
     const fetchPosts = async () => {
       try {
         setLoading(true)
-        setError(null)
 
         const res = (await forumService.getPosts({
           page: 1,
@@ -222,8 +210,12 @@ const ForumPage: React.FC = () => {
         const mapped = (res.posts || []).map(mapApiPostToUI)
         setPosts(mapped)
       } catch (err) {
-        console.error('Error fetching forum posts:', err)
-        setError('Không thể tải bài viết. Vui lòng thử lại sau.')
+        const errorMsg =
+          err instanceof Error
+            ? err.message
+            : (err as any)?.message || 'Lỗi không xác định'
+        console.error('Error fetching forum posts:', errorMsg, err)
+        toast.error('Không thể tải bài viết. Vui lòng thử lại sau.')
       } finally {
         setLoading(false)
       }
@@ -268,7 +260,6 @@ const ForumPage: React.FC = () => {
 
     try {
       setSubmitting(true)
-      setError(null)
 
       const createdPost = (await forumService.createPost({
         content: form.content.trim(),
@@ -296,10 +287,14 @@ const ForumPage: React.FC = () => {
       })
       setImages([])
     } catch (err) {
-      console.error('Error creating forum post:', err)
-      const msg = getErrorMessage(err, 'Đăng bài thất bại')
-      toast.error(msg)
-      setError(msg)
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Đăng bài thất bại'
+      console.error('Error creating forum post:', message, err)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -328,8 +323,14 @@ const ForumPage: React.FC = () => {
         )
       )
     } catch (err) {
-      console.error('Error toggling like:', err)
-      toast.error(getErrorMessage(err, 'Không thể thực hiện thao tác like'))
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Không thể thực hiện thao tác like'
+      console.error('Error toggling like:', message, err)
+      toast.error(message)
       // Revert optimistic update if needed
       setPosts(prev =>
         prev.map(p =>
@@ -360,8 +361,14 @@ const ForumPage: React.FC = () => {
       setPosts(prev => prev.filter(p => p.id !== postId))
       toast.success('Đã xóa bài viết')
     } catch (err) {
-      console.error('Error deleting post:', err)
-      toast.error(getErrorMessage(err, 'Xóa bài viết thất bại'))
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Xóa bài viết thất bại'
+      console.error('Error deleting post:', message, err)
+      toast.error(message)
     }
   }
 
@@ -424,8 +431,14 @@ const ForumPage: React.FC = () => {
         )
       )
     } catch (err) {
-      console.error('Error loading comments:', err)
-      toast.error(getErrorMessage(err, 'Không thể tải bình luận'))
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Không thể tải bình luận'
+      console.error('Error loading comments:', message, err)
+      toast.error(message)
     } finally {
       setCommentsLoading(prev => ({ ...prev, [postId]: false }))
     }
@@ -449,9 +462,16 @@ const ForumPage: React.FC = () => {
         )
       )
       setNewComment(prev => ({ ...prev, [postId]: '' }))
+      toast.success('Gửi bình luận thành công')
     } catch (err) {
-      console.error('Error adding comment:', err)
-      toast.error(getErrorMessage(err, 'Gửi bình luận thất bại'))
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Gửi bình luận thất bại'
+      console.error('Error adding comment:', message, err)
+      toast.error(message)
     }
   }
 
@@ -498,7 +518,6 @@ const ForumPage: React.FC = () => {
   return (
     <>
       <Header />
-      <ToastContainer position="top-right" autoClose={2500} />
       {lightbox && (
         <div
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
@@ -803,9 +822,9 @@ const ForumPage: React.FC = () => {
           </div>
         </div>
       )}
-      <main className="min-h-screen bg-gradient-to-b from-green-50/60 to-gray-100 pb-12">
-        <section className="border-b bg-white/80 backdrop-blur">
-          <div className="container mx-auto px-4 py-6">
+      <main className="min-h-screen bg-[linear-gradient(180deg,#f3fbf7_0%,#f8fafc_48%,#eef2ff_100%)] pb-14">
+        <section className="border-b border-emerald-100/70 bg-white/85 backdrop-blur">
+          <div className="mx-auto w-full max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">
               Nhóm chat FreshMart
             </h1>
@@ -816,34 +835,28 @@ const ForumPage: React.FC = () => {
           </div>
         </section>
 
-        <section className="container mx-auto px-4 mt-6 flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 max-w-2xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4">
-              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100">
+        <section className="mx-auto mt-6 grid w-full max-w-7xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[minmax(0,1.55fr),minmax(320px,0.92fr)] lg:items-start lg:px-8">
+          <div className="w-full">
+            <div className="overflow-hidden rounded-[30px] border border-emerald-100/70 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 pb-4 pt-5 sm:px-6">
                 <div>
-                  <h2 className="text-base font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-gray-900">
                     Bảng tin nhóm
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm text-gray-500">
                     Đăng bài mới, hỏi đáp, rủ mọi người mua chung.
                   </p>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 font-medium">
+                <span className="rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
                   {posts.length} bài viết
                 </span>
               </div>
 
-              {error && (
-                <div className="px-4 py-3 border-b border-gray-100 bg-red-50 text-red-700 text-sm">
-                  {error}
-                </div>
-              )}
-
               <form
-                className="border-b border-gray-100 px-4 pb-4 pt-4"
+                className="border-b border-slate-100 px-5 pb-5 pt-5 sm:px-6"
                 onSubmit={handleCreatePost}
               >
-                <div className="space-y-4 rounded-[28px] border border-emerald-100 bg-[linear-gradient(145deg,#fbfffb_0%,#f4fff7_42%,#f7fafc_100%)] p-4 shadow-[0_16px_40px_rgba(34,197,94,0.08)] sm:p-5">
+                <div className="space-y-5 rounded-[30px] border border-emerald-100 bg-[linear-gradient(145deg,#fbfffb_0%,#f4fff7_42%,#f7fafc_100%)] p-5 shadow-[0_18px_42px_rgba(34,197,94,0.1)] sm:p-6">
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-semibold text-emerald-700 shadow-sm">
                       B
@@ -865,7 +878,7 @@ const ForumPage: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="mt-4 space-y-3">
+                      <div className="mt-4 space-y-4">
                         <Input
                           name="title"
                           label="Tiêu đề bài viết"
@@ -892,13 +905,13 @@ const ForumPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <Input
                       name="productName"
                       label="Sản phẩm"
                       value={form.productName}
                       onChange={handleChange}
-                      placeholder="Trứng gà, hành, trái cây..."
+                      placeholder="Trứng gà, hành..."
                       className="rounded-2xl border-white bg-white/95 text-sm shadow-sm"
                     />
                     <Input
@@ -906,7 +919,7 @@ const ForumPage: React.FC = () => {
                       label="Khu vực nhận hàng"
                       value={form.location}
                       onChange={handleChange}
-                      placeholder="Vinhomes, Quận 7, Thủ Đức..."
+                      placeholder="Vinhomes..."
                       className="rounded-2xl border-white bg-white/95 text-sm shadow-sm"
                     />
                     <Input
@@ -918,17 +931,9 @@ const ForumPage: React.FC = () => {
                       onChange={handleChange}
                       className="rounded-2xl border-white bg-white/95 text-sm shadow-sm"
                     />
-                    <Input
-                      name="priceNote"
-                      label="Giá dự kiến"
-                      value={form.priceNote}
-                      onChange={handleChange}
-                      placeholder="Ví dụ: 35k/khay"
-                      className="rounded-2xl border-white bg-white/95 text-sm shadow-sm"
-                    />
                   </div>
 
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr),minmax(0,1.4fr)]">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(0,1.35fr)]">
                     <Input
                       name="groupBuyId"
                       label="Liên kết GroupBuyId"
@@ -939,7 +944,7 @@ const ForumPage: React.FC = () => {
                       className="rounded-2xl border-white bg-white/95 text-sm shadow-sm"
                     />
 
-                    <div className="rounded-[24px] border border-slate-200 bg-white/90 p-3 shadow-sm">
+                    <div className="rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-sm">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
@@ -1046,50 +1051,30 @@ const ForumPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3 rounded-[24px] border border-white/80 bg-white/80 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
-                      <span className="rounded-full bg-slate-100 px-3 py-1">
-                        Nội dung rõ ràng
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1">
-                        Ảnh minh họa dễ nhìn
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1">
-                        Thông tin nhận hàng đầy đủ
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-slate-500">
-                        {submitting
-                          ? 'Đang đăng bài...'
-                          : loading
-                            ? 'Đang tải feed...'
-                            : 'Sẵn sàng đăng bài'}
-                      </span>
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        size="sm"
-                        className="rounded-full bg-emerald-500 px-5 py-2 text-sm text-white hover:bg-emerald-600"
-                        disabled={submitting}
-                      >
-                        Đăng bài
-                      </Button>
-                    </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      className="rounded-full bg-[linear-gradient(135deg,#10b981_0%,#059669_100%)] px-7 py-2.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(16,185,129,0.28)] transition hover:scale-[1.02] hover:shadow-[0_16px_28px_rgba(16,185,129,0.34)] disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Đang đăng...' : 'Đăng bài'}
+                    </Button>
                   </div>
                 </div>
               </form>
 
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+              <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3 sm:px-6">
                 <Input
                   value={filterText}
                   onChange={e => setFilterText(e.target.value)}
                   placeholder="Tìm trong nhóm theo sản phẩm, khu vực, nội dung..."
-                  className="h-9 text-xs"
+                  className="h-10 rounded-xl border-slate-200 bg-white text-sm"
                 />
               </div>
 
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-slate-100">
                 {loading ? (
                   <div className="py-10 text-center text-sm text-gray-500">
                     Đang tải bài viết...
@@ -1104,15 +1089,15 @@ const ForumPage: React.FC = () => {
                     <article
                       key={post.id}
                       id={`post-${post.id}`}
-                      className="mx-3 my-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
+                      className="mx-4 my-5 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)] sm:mx-5"
                     >
-                      <header className="flex items-start justify-between px-4 pb-2 pt-4">
+                      <header className="flex items-start justify-between px-5 pb-2 pt-5 sm:px-6">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-sm font-semibold text-emerald-700">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-base font-semibold text-emerald-700">
                             {post.author.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="text-[18px] font-semibold leading-5 text-slate-900">
+                            <div className="text-base font-semibold leading-5 text-slate-900 sm:text-lg">
                               {post.author}
                             </div>
                             <div className="mt-1 text-sm text-slate-500">
@@ -1130,11 +1115,11 @@ const ForumPage: React.FC = () => {
                         </button>
                       </header>
 
-                      <div className="px-4 pb-3">
-                        <h3 className="mb-1 text-lg font-semibold text-slate-900">
+                      <div className="px-5 pb-4 sm:px-6">
+                        <h3 className="mb-1.5 text-lg font-semibold text-slate-900 sm:text-xl">
                           {post.title}
                         </h3>
-                        <p className="whitespace-pre-line text-[17px] leading-7 text-slate-700">
+                        <p className="whitespace-pre-line text-[15px] leading-7 text-slate-700 sm:text-base">
                           {post.content}
                         </p>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -1202,7 +1187,7 @@ const ForumPage: React.FC = () => {
                       )}
 
                       {post.tags.length > 0 && (
-                        <div className="px-4 pt-3 flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 px-5 pt-3 sm:px-6">
                           {post.tags.filter(Boolean).map(tag => (
                             <span
                               key={tag}
@@ -1214,7 +1199,7 @@ const ForumPage: React.FC = () => {
                         </div>
                       )}
 
-                      <div className="space-y-1 px-4 py-3">
+                      <div className="space-y-1 px-5 py-3.5 sm:px-6">
                         <div className="flex items-center justify-between text-sm text-slate-500">
                           <div>{post.likes} lượt thích</div>
                           <button
@@ -1231,7 +1216,7 @@ const ForumPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleToggleLike(post.id)}
-                          className={`flex items-center justify-center gap-2 py-3 transition hover:bg-slate-50 ${
+                          className={`flex items-center justify-center gap-2 py-3.5 transition hover:bg-slate-50 ${
                             post.liked ? 'text-emerald-600' : ''
                           }`}
                         >
@@ -1254,7 +1239,7 @@ const ForumPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenComments(post.id)}
-                          className="flex items-center justify-center gap-2 py-3 transition hover:bg-slate-50"
+                          className="flex items-center justify-center gap-2 py-3.5 transition hover:bg-slate-50"
                         >
                           <svg
                             className="h-5 w-5"
@@ -1275,7 +1260,7 @@ const ForumPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleSharePost(post.id)}
-                          className="flex items-center justify-center gap-2 py-3 transition hover:bg-slate-50"
+                          className="flex items-center justify-center gap-2 py-3.5 transition hover:bg-slate-50"
                         >
                           <svg
                             className="h-5 w-5"
@@ -1300,24 +1285,24 @@ const ForumPage: React.FC = () => {
             </div>
           </div>
 
-          <aside className="w-full lg:w-80 lg:flex-shrink-0 space-y-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">
+          <aside className="w-full space-y-4 lg:sticky lg:top-24">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+              <h2 className="mb-2 text-base font-semibold text-gray-900">
                 Tin mới nhất
               </h2>
-              <p className="text-xs text-gray-500 mb-3">
+              <p className="mb-4 text-sm text-gray-500">
                 Các bài đăng gần đây giúp bạn không bỏ lỡ đơn mua chung nào.
               </p>
-              <div className="space-y-3">
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
                 {posts.map(post => (
                   <div
                     key={post.id}
-                    className="rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-800"
+                    className="rounded-2xl bg-slate-50 px-3.5 py-3 text-xs text-gray-800"
                   >
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
                       <button
                         type="button"
-                        className="truncate text-left font-semibold hover:text-emerald-700"
+                        className="truncate text-left text-sm font-semibold hover:text-emerald-700"
                         onClick={() => handleOpenComments(post.id)}
                       >
                         {post.productName || post.title}
