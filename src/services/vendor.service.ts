@@ -105,11 +105,11 @@ export const vendorService = {
     )
   },
 
-  createProduct(payload: CreateProductPayload) {
+  createProduct(payload: CreateProductPayload | FormData) {
     return apiClient.post<BaseResponse<VendorProduct>>('/api/products', payload)
   },
 
-  updateProduct(id: string | number, payload: UpdateProductPayload) {
+  updateProduct(id: string | number, payload: UpdateProductPayload | FormData) {
     return apiClient.put<BaseResponse<VendorProduct>>(
       `/api/vendors/products/${id}`,
       payload

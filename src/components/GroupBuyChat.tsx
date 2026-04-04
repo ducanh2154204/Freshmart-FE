@@ -14,9 +14,8 @@ export const GroupBuyChat: React.FC<GroupBuyChatProps> = ({ groupBuyId }) => {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  const { messages, isConnected, error, sendMessage } = useGroupBuyChat(
-    groupBuyId
-  )
+  const { messages, isConnected, error, sendMessage } =
+    useGroupBuyChat(groupBuyId)
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,7 +101,7 @@ export const GroupBuyChat: React.FC<GroupBuyChatProps> = ({ groupBuyId }) => {
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Nhập tin nhắn..."
-          className="flex-1 text-sm px-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          className="flex-1 text-sm px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-full placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         />
         <Button
           type="submit"
@@ -116,4 +115,3 @@ export const GroupBuyChat: React.FC<GroupBuyChatProps> = ({ groupBuyId }) => {
     </div>
   )
 }
-

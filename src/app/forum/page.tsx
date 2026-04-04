@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'react-toastify'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Header } from '@/components/Header'
@@ -12,8 +13,6 @@ import type {
   ForumPostsResponse,
 } from '@/types/forum'
 import type { ApiError } from '@/types/api'
-import { ToastContainer, toast } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 import { useConfirm } from '@/components/ui/confirm'
 
 type JoinStatus = 'open' | 'full' | 'closed'
@@ -68,7 +67,6 @@ const ForumPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [commentsByPost, setCommentsByPost] = useState<
     Record<string | number, ForumComment[]>
   >({})
@@ -171,15 +169,6 @@ const ForumPage: React.FC = () => {
     }
   }
 
-  const getErrorMessage = (err: unknown, fallback: string) => {
-    const e = err as Partial<ApiError> | any
-    return (
-      (typeof e?.message === 'string' && e.message) ||
-      (typeof e?.details?.message === 'string' && e.details.message) ||
-      fallback
-    )
-  }
-
   const validateBeforeCreate = () => {
     const content = form.content.trim()
     if (!content) return 'Vui lòng nhập nội dung bài viết'
@@ -212,7 +201,6 @@ const ForumPage: React.FC = () => {
     const fetchPosts = async () => {
       try {
         setLoading(true)
-        setError(null)
 
         const res = (await forumService.getPosts({
           page: 1,
@@ -227,7 +215,7 @@ const ForumPage: React.FC = () => {
             ? err.message
             : (err as any)?.message || 'Lỗi không xác định'
         console.error('Error fetching forum posts:', errorMsg, err)
-        setError('Không thể tải bài viết. Vui lòng thử lại sau.')
+        toast.error('Không thể tải bài viết. Vui lòng thử lại sau.')
       } finally {
         setLoading(false)
       }
@@ -272,7 +260,6 @@ const ForumPage: React.FC = () => {
 
     try {
       setSubmitting(true)
-      setError(null)
 
       const createdPost = (await forumService.createPost({
         content: form.content.trim(),
@@ -300,10 +287,14 @@ const ForumPage: React.FC = () => {
       })
       setImages([])
     } catch (err) {
-      const msg = getErrorMessage(err, 'Đăng bài thất bại')
-      console.error('Error creating forum post:', msg, err)
-      toast.error(msg)
-      setError(msg)
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Đăng bài thất bại'
+      console.error('Error creating forum post:', message, err)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -332,12 +323,14 @@ const ForumPage: React.FC = () => {
         )
       )
     } catch (err) {
-      const likeError = getErrorMessage(
-        err,
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
         'Không thể thực hiện thao tác like'
-      )
-      console.error('Error toggling like:', likeError, err)
-      toast.error(likeError)
+      console.error('Error toggling like:', message, err)
+      toast.error(message)
       // Revert optimistic update if needed
       setPosts(prev =>
         prev.map(p =>
@@ -368,9 +361,14 @@ const ForumPage: React.FC = () => {
       setPosts(prev => prev.filter(p => p.id !== postId))
       toast.success('Đã xóa bài viết')
     } catch (err) {
-      const deleteError = getErrorMessage(err, 'Xóa bài viết thất bại')
-      console.error('Error deleting post:', deleteError, err)
-      toast.error(deleteError)
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Xóa bài viết thất bại'
+      console.error('Error deleting post:', message, err)
+      toast.error(message)
     }
   }
 
@@ -433,9 +431,14 @@ const ForumPage: React.FC = () => {
         )
       )
     } catch (err) {
-      const commentError = getErrorMessage(err, 'Không thể tải bình luận')
-      console.error('Error loading comments:', commentError, err)
-      toast.error(commentError)
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Không thể tải bình luận'
+      console.error('Error loading comments:', message, err)
+      toast.error(message)
     } finally {
       setCommentsLoading(prev => ({ ...prev, [postId]: false }))
     }
@@ -459,10 +462,16 @@ const ForumPage: React.FC = () => {
         )
       )
       setNewComment(prev => ({ ...prev, [postId]: '' }))
+      toast.success('Gửi bình luận thành công')
     } catch (err) {
-      const addCommentError = getErrorMessage(err, 'Gửi bình luận thất bại')
-      console.error('Error adding comment:', addCommentError, err)
-      toast.error(addCommentError)
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Gửi bình luận thất bại'
+      console.error('Error adding comment:', message, err)
+      toast.error(message)
     }
   }
 
@@ -509,7 +518,6 @@ const ForumPage: React.FC = () => {
   return (
     <>
       <Header />
-      <ToastContainer position="top-right" autoClose={2500} />
       {lightbox && (
         <div
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
@@ -843,12 +851,6 @@ const ForumPage: React.FC = () => {
                   {posts.length} bài viết
                 </span>
               </div>
-
-              {error && (
-                <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700 sm:px-6">
-                  {error}
-                </div>
-              )}
 
               <form
                 className="border-b border-slate-100 px-5 pb-5 pt-5 sm:px-6"

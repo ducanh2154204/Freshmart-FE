@@ -2,9 +2,12 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
 import { Header } from '@/components/Header'
 import { Button } from '@/components/ui/Button'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { AddProductModal } from '@/components/AddProductModal'
+import { EditProductModal } from '@/components/EditProductModal'
 import {
   vendorService,
   type VendorProfile,
@@ -19,16 +22,61 @@ export default function VendorDashboardPage() {
   const [products, setProducts] = useState<VendorProduct[]>([])
   const [orders, setOrders] = useState<VendorOrder[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products')
+  const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null)
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
+  const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false)
+  const [selectedEditProduct, setSelectedEditProduct] =
+    useState<VendorProduct | null>(null)
 
-  const getErrorMessage = (err: unknown, fallback: string) => {
-    const e = err as Partial<ApiError> & { details?: any }
-    return (
-      (typeof e?.message === 'string' && e.message) ||
-      (typeof e?.details?.message === 'string' && e.details.message) ||
-      fallback
-    )
+  const loadProducts = async () => {
+    try {
+      const res = await vendorService.getVendorProducts({ page: 1, limit: 20 })
+      const productData = res as any
+      const prodList = Array.isArray(productData)
+        ? productData
+        : productData?.data || []
+      setProducts(prodList)
+    } catch (err) {
+      console.error('Error loading products:', err)
+    }
+  }
+
+  const handleAddProductSuccess = () => {
+    // Reload products after successful creation
+    loadProducts()
+  }
+
+  const handleEditClick = (product: VendorProduct) => {
+    setSelectedEditProduct(product)
+    setIsEditProductModalOpen(true)
+    setActiveMenuId(null)
+  }
+
+  const handleEditProductSuccess = () => {
+    // Reload products after successful update
+    loadProducts()
+  }
+
+  const handleDeleteProduct = async (productId: string | number) => {
+    if (!confirm('Bạn có chắc muốn xóa sản phẩm này không?')) {
+      return
+    }
+
+    try {
+      await vendorService.deleteProduct(productId)
+      toast.success('Xóa sản phẩm thành công!')
+      loadProducts()
+      setActiveMenuId(null)
+    } catch (err) {
+      const apiError = err as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Không thể xóa sản phẩm'
+      toast.error(message)
+    }
   }
 
   useEffect(() => {
@@ -43,7 +91,6 @@ export default function VendorDashboardPage() {
 
       try {
         setLoading(true)
-        setError(null)
 
         // Check vendor profile
         const vendor = await vendorService.getMyVendor()
@@ -83,7 +130,13 @@ export default function VendorDashboardPage() {
           // Vendor not found, redirect to profile
           router.push('/profile')
         } else {
-          setError(getErrorMessage(err, 'Không thể tải bảng điều khiển vendor'))
+          const apiError = err as Partial<ApiError> & { details?: any }
+          const message =
+            (typeof apiError?.message === 'string' && apiError.message) ||
+            (typeof apiError?.details?.message === 'string' &&
+              apiError.details.message) ||
+            'Không thể tải bảng điều khiển vendor'
+          toast.error(message)
         }
       } finally {
         setLoading(false)
@@ -141,12 +194,6 @@ export default function VendorDashboardPage() {
           </p>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
-            {error}
-          </div>
-        )}
-
         {/* Tab Navigation */}
         <div className="mb-6 border-b border-gray-200">
           <div className="flex gap-4">
@@ -180,7 +227,10 @@ export default function VendorDashboardPage() {
               <h2 className="text-xl font-semibold text-gray-900">
                 Quản lý sản phẩm
               </h2>
-              <Button className="bg-green-500 hover:bg-green-600 text-white">
+              <Button
+                onClick={() => setIsAddProductModalOpen(true)}
+                className="bg-green-500 hover:bg-green-600 text-white"
+              >
                 + Thêm sản phẩm
               </Button>
             </div>
@@ -190,45 +240,75 @@ export default function VendorDashboardPage() {
                 <p className="text-gray-600">Chưa có sản phẩm nào</p>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-3">
                 {products.map(product => (
                   <div
                     key={product.id}
-                    className="rounded-lg border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow"
+                    className="flex gap-4 rounded-lg border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow"
                   >
+                    {/* Product image */}
                     {product.image && (
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="w-full h-40 object-cover rounded-md mb-3"
+                        className="w-28 h-28 object-cover rounded-md flex-shrink-0"
                       />
                     )}
-                    <h3 className="font-semibold text-gray-900 line-clamp-2">
-                      {product.name}
-                    </h3>
-                    <div className="mt-2 flex justify-between items-center">
-                      <span className="text-lg font-bold text-green-600">
-                        ${product.price?.toFixed(2)}
-                      </span>
-                      {product.stock !== undefined && (
-                        <span className="text-sm text-gray-600">
-                          Còn: {product.stock}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        type="button"
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1"
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        type="button"
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs py-1"
-                      >
-                        Xóa
-                      </Button>
+                    {/* Product info */}
+                    <div className="flex-1 flex flex-col justify-between min-w-0">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 line-clamp-2">
+                          {product.name}
+                        </h3>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-lg font-bold text-green-600">
+                            {Number(product.price || 0).toLocaleString('vi-VN')}{' '}
+                            đ
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {product.stock !== undefined && (
+                              <span className="text-sm text-gray-600 whitespace-nowrap">
+                                Còn: {product.stock}
+                              </span>
+                            )}
+                            {/* Menu button on same line as stock */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActiveMenuId(
+                                    activeMenuId === product.id
+                                      ? null
+                                      : product.id
+                                  )
+                                }
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium whitespace-nowrap"
+                                title="Chỉnh sửa"
+                              >
+                                Chỉnh sửa
+                              </button>
+                              {activeMenuId === product.id && (
+                                <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-max">
+                                  <button
+                                    onClick={() => handleEditClick(product)}
+                                    className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                                  >
+                                    ✏️ Sửa
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteProduct(product.id)
+                                    }
+                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-gray-200"
+                                  >
+                                    🗑️ Xóa
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -287,7 +367,10 @@ export default function VendorDashboardPage() {
                           <p key={idx} className="text-gray-700">
                             {item.productName} x{item.quantity} =
                             <span className="font-semibold">
-                              ${(item.price * item.quantity).toFixed(2)}
+                              {Number(
+                                item.price * item.quantity
+                              ).toLocaleString('vi-VN')}{' '}
+                              đ
                             </span>
                           </p>
                         ))}
@@ -296,7 +379,9 @@ export default function VendorDashboardPage() {
 
                     <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
                       <p className="font-bold text-gray-900">
-                        Tổng: ${order.totalAmount?.toFixed(2)}
+                        Tổng:{' '}
+                        {Number(order.totalAmount || 0).toLocaleString('vi-VN')}{' '}
+                        đ
                       </p>
                       {order.status === 'pending' && (
                         <Button
@@ -314,6 +399,19 @@ export default function VendorDashboardPage() {
           </div>
         )}
       </main>
+
+      <AddProductModal
+        isOpen={isAddProductModalOpen}
+        onClose={() => setIsAddProductModalOpen(false)}
+        onSuccess={handleAddProductSuccess}
+      />
+
+      <EditProductModal
+        isOpen={isEditProductModalOpen}
+        onClose={() => setIsEditProductModalOpen(false)}
+        onSuccess={handleEditProductSuccess}
+        product={selectedEditProduct}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import { toast } from 'react-toastify'
 import { groupBuyingService } from '@/services/group-buying.service'
 import { orderService } from '@/services/order.service'
 import type { GroupBuying, Order, OrderStatusResponse } from '@/types'
@@ -19,7 +20,6 @@ export default function PaymentPage() {
   const [groupBuy, setGroupBuy] = useState<GroupBuying | null>(null)
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [orderStatus, setOrderStatus] = useState<OrderStatusResponse | null>(
     null
   )
@@ -29,7 +29,7 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (!orderId) {
-      setError('Không tìm thấy mã đơn hàng')
+      toast.error('Không tìm thấy mã đơn hàng')
       setLoading(false)
       return
     }
@@ -47,7 +47,6 @@ export default function PaymentPage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      setError(null)
 
       // Lấy thông tin group buy
       const groupBuyResponse =
@@ -83,7 +82,7 @@ export default function PaymentPage() {
       }
     } catch (err: any) {
       console.error('Error fetching data:', err)
-      setError(err?.message || 'Không thể tải thông tin thanh toán')
+      toast.error(err?.message || 'Không thể tải thông tin thanh toán')
     } finally {
       setLoading(false)
     }
@@ -148,7 +147,6 @@ export default function PaymentPage() {
     if (!orderId) return
 
     try {
-      setError(null)
       const response = await orderService.getOrderStatus(orderId)
       const statusData = (response as any).data || response
 
@@ -168,7 +166,7 @@ export default function PaymentPage() {
       }
     } catch (err: any) {
       console.error('Check status error:', err)
-      setError('Không thể kiểm tra trạng thái đơn hàng')
+      toast.error('Không thể kiểm tra trạng thái đơn hàng')
     }
   }
 
@@ -180,13 +178,11 @@ export default function PaymentPage() {
     )
   }
 
-  if (error || !order) {
+  if (!order) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <div className="text-red-500 mb-4">
-            {error || 'Không tìm thấy đơn hàng'}
-          </div>
+          <div className="text-red-500 mb-4">Không tìm thấy đơn hàng</div>
           <Button onClick={() => router.push('/group-buying')}>
             Quay lại trang mua chung
           </Button>

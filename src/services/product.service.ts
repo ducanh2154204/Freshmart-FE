@@ -49,4 +49,11 @@ export const productService = {
       } as Record<string, string | number | boolean>,
     })
   },
+
+  /**
+   * Lấy tất cả danh mục
+   */
+  getCategories() {
+    return apiClient.get('/api/products/categories/all')
+  },
 }

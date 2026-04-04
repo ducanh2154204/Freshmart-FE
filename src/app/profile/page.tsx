@@ -2,14 +2,17 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
 import { Header } from '@/components/Header'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { EditUserProfileModal } from '@/components/EditUserProfileModal'
 import {
   vendorService,
   type VendorProfile,
   type VendorRegisterPayload,
 } from '@/services/vendor.service'
+import { userService, type UserProfile } from '@/services/user.service'
 import type { ApiError } from '@/types/api'
 
 interface StoredUser {
@@ -21,11 +24,11 @@ interface StoredUser {
 export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState<StoredUser | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [userLoading, setUserLoading] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [vendorChecking, setVendorChecking] = useState(false)
   const [vendorRegistering, setVendorRegistering] = useState(false)
-  const [vendorError, setVendorError] = useState<string | null>(null)
-  const [vendorSuccess, setVendorSuccess] = useState<string | null>(null)
   const [vendorProfile, setVendorProfile] = useState<VendorProfile | null>(null)
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
   const [vendorForm, setVendorForm] = useState<VendorRegisterPayload>({
@@ -38,15 +41,6 @@ export default function ProfilePage() {
       accountName: '',
     },
   })
-
-  const getErrorMessage = (error: unknown, fallback: string) => {
-    const e = error as Partial<ApiError> & { details?: any }
-    return (
-      (typeof e?.message === 'string' && e.message) ||
-      (typeof e?.details?.message === 'string' && e.details.message) ||
-      fallback
-    )
-  }
 
   const loadVendorProfile = async () => {
     if (typeof window === 'undefined') return
@@ -66,15 +60,61 @@ export default function ProfilePage() {
       if (status === 404) {
         setVendorProfile(null)
       } else {
-        setVendorError(getErrorMessage(error, 'Không thể tải thông tin vendor'))
+        const apiError = error as Partial<ApiError> & { details?: any }
+        const message =
+          (typeof apiError?.message === 'string' && apiError.message) ||
+          (typeof apiError?.details?.message === 'string' &&
+            apiError.details.message) ||
+          'Không thể tải thông tin vendor'
+        toast.error(message)
       }
     } finally {
       setVendorChecking(false)
     }
   }
 
+  const loadUserProfile = async () => {
+    if (typeof window === 'undefined') return
+
+    const token = window.localStorage.getItem('accessToken')
+    if (!token) {
+      setUserProfile(null)
+      return
+    }
+
+    try {
+      setUserLoading(true)
+      const userData = await userService.getMe()
+      setUserProfile(userData || null)
+      // Update localStorage with latest user data
+      if (userData) {
+        const userToStore = {
+          fullName: userData.name,
+          name: userData.name,
+          email: userData.email,
+        }
+        window.localStorage.setItem('user', JSON.stringify(userToStore))
+        window.dispatchEvent(new Event('auth:changed'))
+      }
+    } catch (error) {
+      const apiError = error as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Không thể tải thông tin cá nhân'
+      console.error('Error loading user profile:', message)
+    } finally {
+      setUserLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    // Load user profile from API
+    loadUserProfile()
+
     try {
       const rawUser = window.localStorage.getItem('user')
       if (rawUser) {
@@ -84,50 +124,20 @@ export default function ProfilePage() {
       setUser(null)
     }
 
-    try {
-      const storedAvatar = window.localStorage.getItem('avatarUrl')
-      if (storedAvatar) {
-        setAvatarUrl(storedAvatar)
-      }
-    } catch {
-      setAvatarUrl(null)
-    }
-
     loadVendorProfile()
   }, [])
 
   const displayName = useMemo(() => {
-    if (!user) return 'Người dùng'
-    return (
-      user.fullName?.trim() ||
-      user.name?.trim() ||
-      user.email?.trim() ||
-      'Người dùng'
-    )
-  }, [user])
+    if (userProfile?.name) return userProfile.name
+    if (user?.fullName?.trim()) return user.fullName
+    if (user?.name?.trim()) return user.name
+    if (user?.email?.trim()) return user.email
+    return 'Người dùng'
+  }, [userProfile, user])
 
   const initial = useMemo(() => {
     return displayName ? (displayName.trim()[0]?.toUpperCase() ?? '') : ''
   }, [displayName])
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarUrl(reader.result)
-        try {
-          window.localStorage.setItem('avatarUrl', reader.result)
-          window.dispatchEvent(new Event('auth:changed'))
-        } catch {
-          // ignore
-        }
-      }
-    }
-    reader.readAsDataURL(file)
-  }
 
   const email = user?.email
 
@@ -205,8 +215,6 @@ export default function ProfilePage() {
 
   const handleVendorRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    setVendorError(null)
-    setVendorSuccess(null)
 
     const payload = {
       storeName: vendorForm.storeName.trim(),
@@ -226,14 +234,14 @@ export default function ProfilePage() {
       !payload.bankAccountDetails.accountNumber ||
       !payload.bankAccountDetails.accountName
     ) {
-      setVendorError('Vui lòng nhập đầy đủ thông tin đăng ký vendor')
+      toast.error('Vui lòng nhập đầy đủ thông tin đăng ký vendor')
       return
     }
 
     try {
       setVendorRegistering(true)
       await vendorService.register(payload)
-      setVendorSuccess('Đăng ký vendor thành công. Hệ thống sẽ xét duyệt sớm.')
+      toast.success('Đăng ký vendor thành công. Hệ thống sẽ xét duyệt sớm.')
       setVendorForm({
         storeName: '',
         slug: '',
@@ -247,7 +255,13 @@ export default function ProfilePage() {
       setSlugManuallyEdited(false)
       await loadVendorProfile()
     } catch (error) {
-      setVendorError(getErrorMessage(error, 'Đăng ký vendor thất bại'))
+      const apiError = error as Partial<ApiError> & { details?: any }
+      const message =
+        (typeof apiError?.message === 'string' && apiError.message) ||
+        (typeof apiError?.details?.message === 'string' &&
+          apiError.details.message) ||
+        'Đăng ký vendor thất bại'
+      toast.error(message)
     } finally {
       setVendorRegistering(false)
     }
@@ -266,9 +280,9 @@ export default function ProfilePage() {
           <div className="flex flex-col md:flex-row md:items-center gap-6 mb-8">
             <div className="flex flex-col items-center gap-3">
               <div className="h-28 w-28 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-3xl font-semibold overflow-hidden">
-                {avatarUrl ? (
+                {userProfile?.avatarUrl ? (
                   <img
-                    src={avatarUrl}
+                    src={userProfile.avatarUrl}
                     alt={displayName}
                     className="h-full w-full object-cover"
                   />
@@ -277,52 +291,57 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              <label className="cursor-pointer">
-                <span className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full bg-green-50 text-green-700 hover:bg-green-100">
-                  Đổi ảnh đại diện
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarChange}
-                />
-              </label>
+              <p className="text-xs text-gray-500">
+                Nhấn "Chỉnh Sửa" để thay đổi ảnh đại diện
+              </p>
             </div>
 
             <div className="flex-1 space-y-2">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">
-                  Họ và tên
-                </p>
-                <p className="text-base font-medium text-gray-900">
-                  {displayName}
-                </p>
-              </div>
-              {email && (
+              <div className="flex-1">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Email
+                    Họ và tên
                   </p>
-                  <p className="text-base text-gray-800">{email}</p>
+                  <p className="text-base font-medium text-gray-900 mt-1">
+                    {displayName}
+                  </p>
                 </div>
-              )}
+                {userProfile?.email && (
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                      Email
+                    </p>
+                    <p className="text-base text-gray-800 mt-1">
+                      {userProfile.email}
+                    </p>
+                  </div>
+                )}
+                <Button
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium text-sm rounded-lg"
+                >
+                  Chỉnh Sửa
+                </Button>
+              </div>
             </div>
           </div>
 
           <div className="border-t border-gray-100 pt-6 mt-2">
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-600">
               Thông tin hồ sơ sẽ được sử dụng để cá nhân hoá trải nghiệm mua sắm
               của bạn trên FreshMart.
             </p>
-            <Button
-              type="button"
-              className="bg-green-500 hover:bg-green-600 text-white font-semibold"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            >
-              Lưu thay đổi
-            </Button>
           </div>
+
+          <EditUserProfileModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            onSuccess={async () => {
+              setIsEditModalOpen(false)
+              await loadUserProfile()
+            }}
+            userProfile={userProfile}
+          />
 
           <section className="mt-8 border-t border-gray-100 pt-8">
             <div className="mb-6 flex items-center justify-between gap-3">
@@ -561,18 +580,6 @@ export default function ProfilePage() {
                     />
                   </div>
                 </div>
-
-                {vendorError && (
-                  <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {vendorError}
-                  </p>
-                )}
-
-                {vendorSuccess && (
-                  <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                    {vendorSuccess}
-                  </p>
-                )}
 
                 <div className="flex justify-end">
                   <Button

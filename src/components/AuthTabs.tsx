@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { authService } from '@/services/auth.service'
@@ -21,8 +22,6 @@ export const AuthTabs: React.FC = () => {
   })
   const [loginLoading, setLoginLoading] = useState(false)
   const [registerLoading, setRegisterLoading] = useState(false)
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [registerError, setRegisterError] = useState<string | null>(null)
 
   const extractToken = (response: unknown): string | null => {
     const r = response as any
@@ -35,14 +34,12 @@ export const AuthTabs: React.FC = () => {
     )
   }
 
-  const extractUser = (response: unknown): { fullName?: string; email?: string } | null => {
+  const extractUser = (
+    response: unknown
+  ): { fullName?: string; email?: string } | null => {
     const r = response as any
     const user =
-      r?.data?.user ??
-      r?.data?.account ??
-      r?.user ??
-      r?.account ??
-      null
+      r?.data?.user ?? r?.data?.account ?? r?.user ?? r?.account ?? null
 
     if (!user || typeof user !== 'object') return null
     return {
@@ -55,7 +52,6 @@ export const AuthTabs: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoginError(null)
     setLoginLoading(true)
 
     try {
@@ -63,7 +59,7 @@ export const AuthTabs: React.FC = () => {
       const token = extractToken(response)
       const user = extractUser(response)
       if (!token) {
-        setLoginError('Đăng nhập thành công nhưng không nhận được accessToken.')
+        toast.error('Đăng nhập thành công nhưng không nhận được accessToken.')
         return
       }
 
@@ -72,12 +68,11 @@ export const AuthTabs: React.FC = () => {
         window.localStorage.setItem('user', JSON.stringify(user))
       }
       window.dispatchEvent(new Event('auth:changed'))
+      toast.success('Đăng nhập thành công!')
       router.push('/')
     } catch (error) {
       const apiError = error as ApiError
-      setLoginError(
-        apiError?.message || 'Đăng nhập thất bại. Vui lòng thử lại.'
-      )
+      toast.error(apiError?.message || 'Đăng nhập thất bại. Vui lòng thử lại.')
     } finally {
       setLoginLoading(false)
     }
@@ -85,10 +80,9 @@ export const AuthTabs: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    setRegisterError(null)
 
     if (registerData.password !== registerData.confirmPassword) {
-      setRegisterError('Mật khẩu xác nhận không khớp.')
+      toast.error('Mật khẩu xác nhận không khớp.')
       return
     }
 
@@ -104,17 +98,17 @@ export const AuthTabs: React.FC = () => {
           window.localStorage.setItem('user', JSON.stringify(user))
         }
         window.dispatchEvent(new Event('auth:changed'))
+        toast.success('Đăng ký thành công!')
         router.push('/')
         return
       }
 
       // Nếu BE không trả token khi đăng ký, chuyển qua tab login
+      toast.success('Đăng ký thành công! Vui lòng đăng nhập.')
       setActiveTab('login')
     } catch (error) {
       const apiError = error as ApiError
-      setRegisterError(
-        apiError?.message || 'Đăng ký thất bại. Vui lòng thử lại.'
-      )
+      toast.error(apiError?.message || 'Đăng ký thất bại. Vui lòng thử lại.')
     } finally {
       setRegisterLoading(false)
     }
@@ -195,10 +189,6 @@ export const AuthTabs: React.FC = () => {
               showPasswordToggle
             />
           </div>
-
-          {loginError && (
-            <p className="text-sm text-red-600">{loginError}</p>
-          )}
 
           <div className="flex items-center justify-between text-sm">
             <label className="flex items-center">
@@ -301,10 +291,6 @@ export const AuthTabs: React.FC = () => {
               showPasswordToggle
             />
           </div>
-
-          {registerError && (
-            <p className="text-sm text-red-600">{registerError}</p>
-          )}
 
           <div>
             <label
