@@ -99,8 +99,16 @@ export const orderService = {
             clearInterval(pollInterval)
             resolve(statusData)
           }
-        } catch (error) {
-          console.error('Poll error:', error)
+        } catch (error: any) {
+          const errorMsg = error?.message || 'Unknown error'
+          const errorStatus = error?.status || error?.response?.status || 'N/A'
+          const errorDetails = error?.details || error?.response?.data || error
+
+          console.error(`Poll error (attempt ${attempts}/${maxAttempts}):`, {
+            message: errorMsg,
+            status: errorStatus,
+            details: errorDetails,
+          })
           // Không dừng polling khi gặp lỗi API, chỉ log và tiếp tục
           // clearInterval(pollInterval)
           // reject(error)

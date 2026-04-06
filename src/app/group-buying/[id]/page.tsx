@@ -98,6 +98,59 @@ export default function GroupBuyingDetailPage() {
     return () => clearInterval(interval)
   }, [groupBuy?.endTime])
 
+  // Polling để kiểm tra status group mỗi 3 giây khi user đã join
+  useEffect(() => {
+    // Check nếu user đã join
+    if (!currentUserId || !groupBuy || !Array.isArray(groupBuy.participants))
+      return
+    const userJoined = groupBuy.participants.some(
+      (p: any) => String(p.userId || p.id) === String(currentUserId)
+    )
+    if (!userJoined) return
+
+    let wasGroupFull = false
+    const isFull = (g: GroupBuying) => {
+      const targetPeople = Number(g.targetQuantity || g.maxParticipants || 10)
+      const participantsValue = Array.isArray(g.participants)
+        ? g.participants.length
+        : typeof g.participants === 'number'
+          ? g.participants
+          : 0
+      const currentPeople = Number(
+        g.currentQuantity || g.currentParticipants || participantsValue || 0
+      )
+      return currentPeople >= targetPeople
+    }
+
+    const checkGroupStatus = async () => {
+      try {
+        const response = await groupBuyingService.getGroupBuyingById(groupBuyId)
+        const updatedGroup =
+          (response as any)?.data?.data || (response as any)?.data || response
+
+        if (updatedGroup) {
+          setGroupBuy(updatedGroup)
+
+          // Kiểm tra xem group mới full nhưng trước đó chưa full
+          if (isFull(updatedGroup) && !wasGroupFull) {
+            wasGroupFull = true
+            toast.success('✓ Nhóm đã đủ người! Bạn có thể thanh toán ngay.')
+          }
+        }
+      } catch (err) {
+        console.error('Error checking group status:', err)
+      }
+    }
+
+    // Check ngay lần đầu
+    checkGroupStatus()
+
+    // Sau đó polling mỗi 3 giây
+    const interval = setInterval(checkGroupStatus, 3000)
+
+    return () => clearInterval(interval)
+  }, [groupBuyId, currentUserId])
+
   const fetchGroupBuyDetails = async (): Promise<GroupBuying | null> => {
     try {
       setLoading(true)
@@ -184,28 +237,7 @@ export default function GroupBuyingDetailPage() {
 
       toast.success('Tham gia nhóm thành công!')
 
-      if (updated) {
-        const targetPeople = Number(
-          updated.targetQuantity || updated.maxParticipants || 10
-        )
-        const participantsValue = Array.isArray(updated.participants)
-          ? updated.participants.length
-          : typeof updated.participants === 'number'
-            ? updated.participants
-            : 0
-        const currentPeople = Number(
-          updated.currentQuantity ||
-            updated.currentParticipants ||
-            participantsValue ||
-            0
-        )
-
-        // Nếu sau khi join mà nhóm đã đủ người thì đưa user sang bước thanh toán
-        if (currentPeople >= targetPeople) {
-          toast.info('Nhóm đã đủ người, chuyển sang bước thanh toán.')
-          router.push(`/group-buying/${groupBuyId}/checkout`)
-        }
-      }
+      // Polling sẽ tự động detect khi group full và enable button thanh toán
     } catch (err: any) {
       console.error('Join group error:', err, {
         keys: err ? Object.keys(err) : [],
