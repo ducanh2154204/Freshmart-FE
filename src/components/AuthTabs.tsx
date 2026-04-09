@@ -71,8 +71,7 @@ export const AuthTabs: React.FC = () => {
 
       // Call API me để lấy đầy đủ thông tin user
       try {
-        const meResponse = await userService.getMe()
-        const fullUserData = meResponse.data ?? meResponse
+        const fullUserData = await userService.getMe()
         window.localStorage.setItem('user', JSON.stringify(fullUserData))
         // Lưu avatarUrl riêng nếu có
         if (fullUserData?.avatarUrl) {
@@ -116,8 +115,7 @@ export const AuthTabs: React.FC = () => {
 
         // Call API me để lấy đầy đủ thông tin user
         try {
-          const meResponse = await userService.getMe()
-          const fullUserData = meResponse.data ?? meResponse
+          const fullUserData = await userService.getMe()
           window.localStorage.setItem('user', JSON.stringify(fullUserData))
           // Lưu avatarUrl riêng nếu có
           if (fullUserData?.avatarUrl) {

@@ -124,6 +124,8 @@ export const Header: React.FC = () => {
   const handleLogout = () => {
     try {
       window.localStorage.removeItem('accessToken')
+      window.localStorage.removeItem('user')
+      window.localStorage.removeItem('avatarUrl')
       window.dispatchEvent(new Event('auth:changed'))
     } catch {
       // ignore
