@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Button } from './ui/Button'
 import { productService } from '@/services/product.service'
+import { formatCurrency } from '@/utils'
 import type { Product } from '@/types/product'
 import type { BaseResponse } from '@/types'
 
@@ -26,14 +27,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   rating = 5,
   discount,
 }) => {
-  const formatPrice = (price: number) => {
-    return (
-      new Intl.NumberFormat('vi-VN', {
-        style: 'decimal',
-      }).format(price) + 'đ'
-    )
-  }
-
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden group">
       {/* Image Container */}
@@ -78,11 +71,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-lg font-bold text-green-600">
-              {formatPrice(price)}
+              {formatCurrency(price)}
             </p>
             {originalPrice && (
               <p className="text-xs text-gray-400 line-through">
-                {formatPrice(originalPrice)}
+                {formatCurrency(originalPrice)}
               </p>
             )}
           </div>

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { AddProductModal } from '@/components/AddProductModal'
 import { EditProductModal } from '@/components/EditProductModal'
+import { formatCurrency } from '@/utils'
 import {
   vendorService,
   type VendorProfile,
@@ -262,8 +263,7 @@ export default function VendorDashboardPage() {
                         </h3>
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <span className="text-lg font-bold text-green-600">
-                            {Number(product.price || 0).toLocaleString('vi-VN')}{' '}
-                            đ
+                            {formatCurrency(Number(product.price || 0))}
                           </span>
                           <div className="flex items-center gap-2">
                             {product.stock !== undefined && (
@@ -367,10 +367,9 @@ export default function VendorDashboardPage() {
                           <p key={idx} className="text-gray-700">
                             {item.productName} x{item.quantity} =
                             <span className="font-semibold">
-                              {Number(
-                                item.price * item.quantity
-                              ).toLocaleString('vi-VN')}{' '}
-                              đ
+                              {formatCurrency(
+                                Number(item.price * item.quantity)
+                              )}
                             </span>
                           </p>
                         ))}
@@ -379,9 +378,7 @@ export default function VendorDashboardPage() {
 
                     <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
                       <p className="font-bold text-gray-900">
-                        Tổng:{' '}
-                        {Number(order.totalAmount || 0).toLocaleString('vi-VN')}{' '}
-                        đ
+                        Tổng: {formatCurrency(Number(order.totalAmount || 0))}
                       </p>
                       {order.status === 'pending' && (
                         <Button
