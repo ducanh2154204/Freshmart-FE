@@ -6,6 +6,7 @@ import { toast } from 'react-toastify'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 import { authService } from '@/services/auth.service'
+import { userService } from '@/services/user.service'
 import type { ApiError } from '@/types/api'
 
 type TabType = 'login' | 'register'
@@ -67,6 +68,21 @@ export const AuthTabs: React.FC = () => {
       if (user) {
         window.localStorage.setItem('user', JSON.stringify(user))
       }
+
+      // Call API me để lấy đầy đủ thông tin user
+      try {
+        const meResponse = await userService.getMe()
+        const fullUserData = meResponse.data ?? meResponse
+        window.localStorage.setItem('user', JSON.stringify(fullUserData))
+        // Lưu avatarUrl riêng nếu có
+        if (fullUserData?.avatarUrl) {
+          window.localStorage.setItem('avatarUrl', fullUserData.avatarUrl)
+        }
+      } catch (meError) {
+        console.warn('Failed to fetch user profile:', meError)
+        // Vẫn tiếp tục với basic user info từ login response
+      }
+
       window.dispatchEvent(new Event('auth:changed'))
       toast.success('Đăng nhập thành công!')
       router.push('/')
@@ -97,6 +113,21 @@ export const AuthTabs: React.FC = () => {
         if (user) {
           window.localStorage.setItem('user', JSON.stringify(user))
         }
+
+        // Call API me để lấy đầy đủ thông tin user
+        try {
+          const meResponse = await userService.getMe()
+          const fullUserData = meResponse.data ?? meResponse
+          window.localStorage.setItem('user', JSON.stringify(fullUserData))
+          // Lưu avatarUrl riêng nếu có
+          if (fullUserData?.avatarUrl) {
+            window.localStorage.setItem('avatarUrl', fullUserData.avatarUrl)
+          }
+        } catch (meError) {
+          console.warn('Failed to fetch user profile:', meError)
+          // Vẫn tiếp tục với basic user info từ register response
+        }
+
         window.dispatchEvent(new Event('auth:changed'))
         toast.success('Đăng ký thành công!')
         router.push('/')

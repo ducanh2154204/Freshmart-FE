@@ -109,9 +109,6 @@ export const orderService = {
             status: errorStatus,
             details: errorDetails,
           })
-          // Không dừng polling khi gặp lỗi API, chỉ log và tiếp tục
-          // clearInterval(pollInterval)
-          // reject(error)
         }
       }, interval)
     })
