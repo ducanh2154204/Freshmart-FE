@@ -60,7 +60,7 @@ export const AuthTabs: React.FC = () => {
       const token = extractToken(response)
       const user = extractUser(response)
       if (!token) {
-        toast.error('Đăng nhập thành công nhưng không nhận được accessToken.')
+        toast.error((response as any)?.message || 'Lỗi đăng nhập')
         return
       }
 
@@ -83,11 +83,11 @@ export const AuthTabs: React.FC = () => {
       }
 
       window.dispatchEvent(new Event('auth:changed'))
-      toast.success('Đăng nhập thành công!')
+      toast.success((response as any)?.message || 'Đăng nhập thành công')
       router.push('/')
     } catch (error) {
       const apiError = error as ApiError
-      toast.error(apiError?.message || 'Đăng nhập thất bại. Vui lòng thử lại.')
+      toast.error(apiError?.message || 'Lỗi đăng nhập')
     } finally {
       setLoginLoading(false)
     }
@@ -112,9 +112,6 @@ export const AuthTabs: React.FC = () => {
         if (user) {
           window.localStorage.setItem('user', JSON.stringify(user))
         }
-<<<<<<< HEAD
-
-        // Call API me để lấy đầy đủ thông tin user
 
         // Call API me để lấy đầy đủ thông tin user
         try {
@@ -129,15 +126,20 @@ export const AuthTabs: React.FC = () => {
           // Vẫn tiếp tục với basic user info từ register response
         }
 
+        window.dispatchEvent(new Event('auth:changed'))
+        toast.success((response as any)?.message || 'Đăng ký thành công')
+        router.push('/')
         return
       }
 
-      // Nếu BE không trả token khi đăng ký, chuyển qua tab login
-      toast.success('Đăng ký thành công! Vui lòng đăng nhập.')
+      // Nếu BE không trả token khi đăng ký, hiển thị message từ BE
+      toast.info(
+        (response as any)?.message || 'Đăng ký thành công! Vui lòng đăng nhập.'
+      )
       setActiveTab('login')
     } catch (error) {
       const apiError = error as ApiError
-      toast.error(apiError?.message || 'Đăng ký thất bại. Vui lòng thử lại.')
+      toast.error(apiError?.message || 'Lỗi đăng ký')
     } finally {
       setRegisterLoading(false)
     }
