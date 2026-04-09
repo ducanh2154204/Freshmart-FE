@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { groupBuyingService } from '@/services/group-buying.service'
+import { formatCurrency } from '@/utils'
 import type { GroupBuying } from '@/types'
 import { Button, Input } from '@/components/ui'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
@@ -427,6 +428,7 @@ export default function GroupBuyingDetailPage() {
                     src={getImageUrl()}
                     alt={groupBuy.product?.name || groupBuy.title || 'Product'}
                     fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     className="object-cover"
                   />
                 </div>
@@ -462,7 +464,7 @@ export default function GroupBuyingDetailPage() {
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-sm text-gray-500">Giá mua lẻ</span>
                     <span className="text-xl text-gray-400 line-through">
-                      {originalPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(originalPrice)}
                     </span>
                   </div>
                   <div className="flex items-baseline gap-2">
@@ -470,13 +472,12 @@ export default function GroupBuyingDetailPage() {
                       Giá mua nhóm
                     </span>
                     <span className="text-3xl font-bold text-green-600">
-                      {currentPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(currentPrice)}
                     </span>
                   </div>
                   {discount > 0 && (
                     <div className="mt-2 inline-block bg-green-100 text-green-700 text-sm px-3 py-1 rounded-full">
-                      Tiết kiệm {discountPercent}% (
-                      {discount.toLocaleString('vi-VN')}đ)
+                      Tiết kiệm {discountPercent}% ({formatCurrency(discount)})
                     </div>
                   )}
                 </div>
@@ -590,13 +591,13 @@ export default function GroupBuyingDetailPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Giá mua chung</span>
                     <span className="font-medium text-gray-900">
-                      {itemPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(itemPrice)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Phí vận chuyển</span>
                     <span className="font-medium text-gray-900">
-                      {shippingFee.toLocaleString('vi-VN')}đ
+                      {formatCurrency(shippingFee)}
                     </span>
                   </div>
                   <div className="border-t-2 border-gray-200 pt-2 flex justify-between items-center">
@@ -604,7 +605,7 @@ export default function GroupBuyingDetailPage() {
                       Tổng cộng
                     </span>
                     <span className="text-2xl font-bold text-green-600">
-                      {totalCost.toLocaleString('vi-VN')}đ
+                      {formatCurrency(totalCost)}
                     </span>
                   </div>
                 </div>

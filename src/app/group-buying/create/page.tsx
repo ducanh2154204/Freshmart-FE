@@ -7,6 +7,7 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { productService } from '@/services/product.service'
 import { groupBuyingService } from '@/services/group-buying.service'
+import { formatCurrency } from '@/utils'
 import type { Product } from '@/types/product'
 import type { ApiError } from '@/types/api'
 
@@ -52,10 +53,6 @@ export default function CreateGroupPage() {
   }, [])
 
   const displayProducts = products
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN').format(price) + ' đ'
-  }
 
   const selectedProductData = displayProducts.find(
     p => p.id === selectedProduct
@@ -226,7 +223,7 @@ export default function CreateGroupPage() {
                         </h3>
                       </div>
                       <p className="text-sm font-semibold text-green-600">
-                        {formatPrice(product.price)}
+                        {formatCurrency(product.price)}
                       </p>
                     </button>
                   ))}
@@ -397,7 +394,7 @@ export default function CreateGroupPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Giá gốc</span>
                     <span className="font-medium text-gray-400 line-through">
-                      {formatPrice(originalPrice * quantity)}
+                      {formatCurrency(originalPrice * quantity)}
                     </span>
                   </div>
                 )}
@@ -406,7 +403,7 @@ export default function CreateGroupPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Giá mua chung</span>
                     <span className="font-medium text-green-600">
-                      {formatPrice(discountedPrice * quantity)}
+                      {formatCurrency(discountedPrice * quantity)}
                     </span>
                   </div>
                 )}
@@ -432,7 +429,7 @@ export default function CreateGroupPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Giao hàng</span>
                   <span className="font-medium text-gray-900">
-                    {formatPrice(shipping)}
+                    {formatCurrency(shipping)}
                   </span>
                 </div>
               </div>
@@ -443,7 +440,7 @@ export default function CreateGroupPage() {
                     Tổng giá trị đơn hàng
                   </span>
                   <span className="text-xl font-bold text-green-600">
-                    {formatPrice(total)}
+                    {formatCurrency(total)}
                   </span>
                 </div>
               </div>

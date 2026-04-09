@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from './ui/Button'
+import { formatCurrency } from '@/utils'
 
 interface GroupBuyingCardProps {
   id?: number | string
@@ -74,12 +75,6 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
     return () => clearInterval(interval)
   }, [endTime])
 
-  const formatPrice = (price: number) => {
-    return (
-      new Intl.NumberFormat('vi-VN', { style: 'decimal' }).format(price) + 'đ'
-    )
-  }
-
   // Tính discount an toàn
   const discountAmount = Math.max(0, originalPrice - currentPrice)
   const discount =
@@ -141,10 +136,10 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
           </h3>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-red-600 font-bold text-base">
-              {formatPrice(currentPrice)}
+              {formatCurrency(currentPrice)}
             </span>
             <span className="text-gray-400 text-xs line-through">
-              {formatPrice(originalPrice)}
+              {formatCurrency(originalPrice)}
             </span>
           </div>
           <Button
@@ -207,10 +202,10 @@ export const GroupBuyingCard: React.FC<GroupBuyingCardProps> = ({
         {/* Price */}
         <div className="flex items-baseline gap-2 mb-3">
           <span className="text-2xl font-bold text-red-600">
-            {formatPrice(currentPrice)}
+            {formatCurrency(currentPrice)}
           </span>
           <span className="text-sm text-gray-400 line-through">
-            {formatPrice(originalPrice)}
+            {formatCurrency(originalPrice)}
           </span>
         </div>
 

@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { toast } from 'react-toastify'
 import { groupBuyingService } from '@/services/group-buying.service'
 import { orderService } from '@/services/order.service'
+import { formatCurrency } from '@/utils'
 import type { GroupBuying, Order, OrderStatusResponse } from '@/types'
 import { Button } from '@/components/ui'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
@@ -327,6 +328,7 @@ export default function PaymentPage() {
                         groupBuy.product?.name || groupBuy.title || 'Product'
                       }
                       fill
+                      sizes="80px"
                       className="object-cover rounded-lg"
                     />
                   </div>
@@ -336,11 +338,11 @@ export default function PaymentPage() {
                     </h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-lg font-bold text-green-600">
-                        {currentPrice.toLocaleString('vi-VN')}đ
+                        {formatCurrency(currentPrice)}
                       </span>
                       {originalPrice > currentPrice && (
                         <span className="text-sm text-gray-400 line-through">
-                          {originalPrice.toLocaleString('vi-VN')}đ
+                          {formatCurrency(originalPrice)}
                         </span>
                       )}
                     </div>
@@ -363,7 +365,7 @@ export default function PaymentPage() {
                   <div className="border-t pt-2 flex justify-between font-semibold">
                     <span className="text-gray-900">Tổng cộng:</span>
                     <span className="text-green-600 text-lg">
-                      {currentPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(currentPrice)}
                     </span>
                   </div>
                 </div>

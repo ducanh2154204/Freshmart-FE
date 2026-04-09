@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { toast } from 'react-toastify'
 import { groupBuyingService } from '@/services/group-buying.service'
 import { orderService } from '@/services/order.service'
+import { formatCurrency } from '@/utils'
 import type { GroupBuying, Order, OrderStatusResponse } from '@/types'
 import { Button } from '@/components/ui'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
@@ -285,6 +286,7 @@ export default function GroupBuyingCheckoutPage() {
                     src={getImageUrl()}
                     alt={groupBuy.product?.name || groupBuy.title || 'Product'}
                     fill
+                    sizes="96px"
                     className="object-cover rounded-lg"
                   />
                 </div>
@@ -294,10 +296,10 @@ export default function GroupBuyingCheckoutPage() {
                   </h3>
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-xl font-bold text-green-600">
-                      {currentPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(currentPrice)}
                     </span>
                     <span className="text-gray-400 line-through">
-                      {originalPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(originalPrice)}đ
                     </span>
                     {discount > 0 && (
                       <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">
@@ -400,20 +402,20 @@ export default function GroupBuyingCheckoutPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Giá gốc</span>
                   <span className="!text-gray-900 font-medium">
-                    {originalPrice.toLocaleString('vi-VN')}đ
+                    {formatCurrency(originalPrice)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Giảm mua chung</span>
                   <span className="!text-red-500 font-medium">
-                    -{discount.toLocaleString('vi-VN')}đ
+                    -{formatCurrency(discount)}
                   </span>
                 </div>
                 <div className="border-t pt-3">
                   <div className="flex justify-between font-semibold text-lg">
                     <span className="!text-gray-900">Tổng cộng</span>
                     <span className="!text-green-600 font-bold text-xl">
-                      {currentPrice.toLocaleString('vi-VN')}đ
+                      {formatCurrency(currentPrice)}
                     </span>
                   </div>
                 </div>
