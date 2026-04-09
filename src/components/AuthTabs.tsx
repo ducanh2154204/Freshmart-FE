@@ -112,6 +112,9 @@ export const AuthTabs: React.FC = () => {
         if (user) {
           window.localStorage.setItem('user', JSON.stringify(user))
         }
+<<<<<<< HEAD
+
+        // Call API me để lấy đầy đủ thông tin user
 
         // Call API me để lấy đầy đủ thông tin user
         try {
@@ -126,9 +129,6 @@ export const AuthTabs: React.FC = () => {
           // Vẫn tiếp tục với basic user info từ register response
         }
 
-        window.dispatchEvent(new Event('auth:changed'))
-        toast.success('Đăng ký thành công!')
-        router.push('/')
         return
       }
 
