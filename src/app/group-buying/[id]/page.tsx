@@ -157,7 +157,7 @@ export default function GroupBuyingDetailPage() {
       setLoading(true)
 
       // Dùng API GET /group-buys/{id}
-      const response = await groupBuyingService.getGroupBuyingById(groupBuyId)
+      let response = await groupBuyingService.getGroupBuyingById(groupBuyId)
 
       // Response có thể là { data: {...} } hoặc direct object
       let groupBuyData: GroupBuying | null = null
@@ -166,6 +166,34 @@ export default function GroupBuyingDetailPage() {
         groupBuyData = (response as any)?.data?.data || (response as any)?.data
       } else {
         groupBuyData = response as GroupBuying
+      }
+
+      // Fallback: If không tìm được, thử fetch từ my-groups
+      if (!groupBuyData || !groupBuyData.id) {
+        console.log('Group not found in public list, trying my-groups...')
+        try {
+          const myGroupsResponse = await groupBuyingService.getMyGroupBuyings()
+          const myGroupsData =
+            (myGroupsResponse as any)?.data || myGroupsResponse
+
+          // Find group with matching ID in my-groups list
+          const myGroupsList = Array.isArray(myGroupsData)
+            ? myGroupsData
+            : Array.isArray((myGroupsData as any)?.data)
+              ? (myGroupsData as any).data
+              : []
+
+          const foundGroup = myGroupsList.find(
+            (g: any) => String(g.id) === String(groupBuyId)
+          )
+
+          if (foundGroup) {
+            groupBuyData = foundGroup
+            console.log('Found group in my-groups:', groupBuyData)
+          }
+        } catch (fallbackErr) {
+          console.warn('Fallback to my-groups failed:', fallbackErr)
+        }
       }
 
       if (!groupBuyData || !groupBuyData.id) {

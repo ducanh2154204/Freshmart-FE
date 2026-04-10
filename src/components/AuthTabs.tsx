@@ -70,12 +70,17 @@ export const AuthTabs: React.FC = () => {
       }
 
       // Call API me để lấy đầy đủ thông tin user
+      let redirectPath = '/' // Default redirect
       try {
         const fullUserData = await userService.getMe()
         window.localStorage.setItem('user', JSON.stringify(fullUserData))
         // Lưu avatarUrl riêng nếu có
         if (fullUserData?.avatarUrl) {
           window.localStorage.setItem('avatarUrl', fullUserData.avatarUrl)
+        }
+        // Check if admin role - redirect to admin dashboard
+        if (fullUserData?.role === 'ADMIN') {
+          redirectPath = '/admin/dashboard'
         }
       } catch (meError) {
         console.warn('Failed to fetch user profile:', meError)
@@ -84,7 +89,7 @@ export const AuthTabs: React.FC = () => {
 
       window.dispatchEvent(new Event('auth:changed'))
       toast.success((response as any)?.message || 'Đăng nhập thành công')
-      router.push('/')
+      router.push(redirectPath)
     } catch (error) {
       const apiError = error as ApiError
       toast.error(apiError?.message || 'Lỗi đăng nhập')
@@ -114,12 +119,17 @@ export const AuthTabs: React.FC = () => {
         }
 
         // Call API me để lấy đầy đủ thông tin user
+        let redirectPath = '/' // Default redirect
         try {
           const fullUserData = await userService.getMe()
           window.localStorage.setItem('user', JSON.stringify(fullUserData))
           // Lưu avatarUrl riêng nếu có
           if (fullUserData?.avatarUrl) {
             window.localStorage.setItem('avatarUrl', fullUserData.avatarUrl)
+          }
+          // Check if admin role - redirect to admin dashboard
+          if (fullUserData?.role === 'ADMIN') {
+            redirectPath = '/admin/dashboard'
           }
         } catch (meError) {
           console.warn('Failed to fetch user profile:', meError)
@@ -128,7 +138,7 @@ export const AuthTabs: React.FC = () => {
 
         window.dispatchEvent(new Event('auth:changed'))
         toast.success((response as any)?.message || 'Đăng ký thành công')
-        router.push('/')
+        router.push(redirectPath)
         return
       }
 

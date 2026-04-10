@@ -12,9 +12,11 @@ import Link from 'next/link'
 
 export default function GroupBuyingPage() {
   const [ongoingDeals, setOngoingDeals] = useState<GroupBuying[]>([])
+  const [myGroups, setMyGroups] = useState<GroupBuying[]>([])
   const [groupBuyingProducts, setGroupBuyingProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'ongoing' | 'my-groups'>('ongoing')
 
   // Get current user ID (from localStorage or auth service)
   useEffect(() => {
@@ -217,7 +219,70 @@ export default function GroupBuyingPage() {
     fetchData()
   }, [])
 
-  const displayDeals = ongoingDeals
+  // Fetch my-groups when tab switches
+  useEffect(() => {
+    if (activeTab !== 'my-groups' || !currentUserId) return
+
+    const fetchMyGroups = async () => {
+      setLoading(true)
+      try {
+        const response = await groupBuyingService.getMyGroupBuyings()
+        const data = response as any
+        const groups = Array.isArray(data) ? data : data?.data || []
+
+        if (Array.isArray(groups) && groups.length > 0) {
+          const mappedGroups = groups.map((group: any) => {
+            const productPrice = parseFloat(group.product?.price || '0')
+            const productOriginalPrice = parseFloat(
+              group.product?.originalPrice || group.product?.price || '0'
+            )
+            const discountPrice = parseFloat(group.discountPrice || '0')
+
+            return {
+              id: group.id,
+              productId: group.productId || group.product?.id || 0,
+              quantity: group.targetQuantity || 1,
+              image:
+                group.image ||
+                group.product?.image ||
+                '/images/placeholder.jpg',
+              title: group.product?.name || group.title || 'Sản phẩm',
+              currentPrice: discountPrice,
+              originalPrice: productOriginalPrice,
+              rating: group.product?.rating || 5,
+              participants: group.participants || [],
+              participantsCount: Array.isArray(group.participants)
+                ? group.participants.length
+                : group.currentQuantity || 0,
+              targetQuantity: group.targetQuantity || 10,
+              currentQuantity:
+                group.currentQuantity ||
+                (Array.isArray(group.participants)
+                  ? group.participants.length
+                  : 0),
+              endTime: group.endTime,
+              status: group.status,
+            }
+          })
+
+          console.log('✅ Loaded my-groups:', mappedGroups)
+          setMyGroups(mappedGroups)
+        } else {
+          console.log('⚠️ No my-groups found')
+          setMyGroups([])
+        }
+      } catch (err: any) {
+        console.error('Error fetching my-groups:', err)
+        setMyGroups([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMyGroups()
+  }, [activeTab, currentUserId])
+
+  const displayDeals = activeTab === 'ongoing' ? ongoingDeals : myGroups
   const displayProducts = groupBuyingProducts
 
   return (
@@ -337,38 +402,71 @@ export default function GroupBuyingPage() {
         </div>
       </section>
 
-      {/* Ongoing Deals */}
+      {/* Deals & My Groups Tabs */}
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center mb-2">
-            <div>
-              <h2 className="text-gray-900 text-2xl font-bold mb-1">
-                Đang diễn ra
-              </h2>
-              <p className="text-sm text-gray-600">
-                Tham gia ngay để nhận ưu đãi
-              </p>
-            </div>
-            <Link
-              href="/group-buying/create"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors"
+          {/* Tab Navigation */}
+          <div className="flex gap-4 mb-8">
+            <button
+              onClick={() => setActiveTab('ongoing')}
+              className={`px-6 py-3 font-semibold rounded-lg transition-all ${
+                activeTab === 'ongoing'
+                  ? 'bg-green-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Tạo nhóm mới
-            </Link>
+              📊 Đang diễn ra
+            </button>
+            <button
+              onClick={() => setActiveTab('my-groups')}
+              className={`px-6 py-3 font-semibold rounded-lg transition-all ${
+                activeTab === 'my-groups'
+                  ? 'bg-green-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              👥 Nhóm của tôi{' '}
+              {currentUserId && myGroups.length > 0 && `(${myGroups.length})`}
+            </button>
           </div>
+
+          {/* Heading */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-gray-900 text-2xl font-bold mb-1">
+                  {activeTab === 'ongoing' ? 'Đang diễn ra' : 'Nhóm của tôi'}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {activeTab === 'ongoing'
+                    ? 'Tham gia ngay để nhận ưu đãi'
+                    : 'Các nhóm bạn tham gia hoặc đã tham gia'}
+                </p>
+              </div>
+              {activeTab === 'ongoing' && (
+                <Link
+                  href="/group-buying/create"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Tạo nhóm mới
+                </Link>
+              )}
+            </div>
+          </div>
+
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               {[...Array(3)].map((_, i) => (

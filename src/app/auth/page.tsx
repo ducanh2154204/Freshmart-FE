@@ -6,7 +6,7 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-orange-50">
       <div className="container mx-auto px-4 py-8">
         {/* Logo / Back to Home */}
-        <div className="mb-8">
+        <div className="mb-8 flex items-center justify-between">
           <Link
             href="/"
             className="inline-flex items-center text-gray-600 hover:text-green-600 transition-colors"
@@ -26,6 +26,14 @@ export default function AuthPage() {
             </svg>
             <span className="font-medium">Quay lại trang chủ</span>
           </Link>
+
+          {/* Admin Access Link */}
+          <a
+            href="#admin-notice"
+            className="inline-flex items-center px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors text-sm font-medium"
+          >
+            👨‍💼 Admin Access
+          </a>
         </div>
 
         <div className="flex flex-col lg:flex-row items-center justify-center gap-12 py-8">
@@ -132,6 +140,67 @@ export default function AuthPage() {
           <div className="w-full lg:w-1/2 max-w-md">
             <div className="bg-white rounded-2xl shadow-xl p-8">
               <AuthTabs />
+            </div>
+          </div>
+        </div>
+
+        {/* Admin Access Section */}
+        <div id="admin-notice" className="mt-16 max-w-2xl mx-auto">
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-6 w-6 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-bold text-red-800 mb-2">
+                  👨‍💼 Admin Access
+                </h3>
+                <div className="text-red-700 space-y-3">
+                  <p className="font-semibold">Để truy cập Admin Dashboard:</p>
+                  <ol className="list-decimal list-inside space-y-2 text-sm">
+                    <li>
+                      <strong>1. Liên hệ quản trị viên</strong> để được cấp tài
+                      khoản admin với role = "ADMIN"
+                    </li>
+                    <li>
+                      <strong>2. Đăng nhập</strong> với email và password của
+                      tài khoản admin
+                    </li>
+                    <li>
+                      <strong>3. Bấm "Admin Access"</strong> hoặc vào trực tiếp{' '}
+                      <code className="bg-red-100 px-2 py-1 rounded text-xs font-mono">
+                        /admin/dashboard
+                      </code>
+                    </li>
+                    <li>
+                      <strong>Lưu ý:</strong> Chỉ tài khoản có role = "ADMIN"
+                      mới có thể truy cập
+                    </li>
+                  </ol>
+                  <div className="mt-4 p-3 bg-red-100 rounded text-sm">
+                    <p className="font-semibold mb-1">📋 Chức năng Admin:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li>📊 Dashboard: Xem thống kê lượt truy cập</li>
+                      <li>
+                        📋 Orders: Quản lý đơn hàng, bộ lọc theo trạng thái
+                      </li>
+                      <li>🏪 Vendors: Quản lý cửa hàng, cấp nhật trạng thái</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

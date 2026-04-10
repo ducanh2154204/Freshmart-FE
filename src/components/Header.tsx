@@ -13,6 +13,7 @@ export const Header: React.FC = () => {
   const menuRef = useRef<HTMLDivElement | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   const syncAuth = () => {
@@ -27,6 +28,7 @@ export const Header: React.FC = () => {
             fullName?: string
             name?: string
             email?: string
+            role?: string
           }
           const name =
             parsed.fullName?.trim() ||
@@ -35,13 +37,16 @@ export const Header: React.FC = () => {
             null
           setUserName(name)
           setUserEmail(parsed.email ?? null)
+          setUserRole(parsed.role ?? null)
         } catch {
           setUserName(null)
           setUserEmail(null)
+          setUserRole(null)
         }
       } else {
         setUserName(null)
         setUserEmail(null)
+        setUserRole(null)
       }
 
       const storedAvatar = window.localStorage.getItem('avatarUrl')
@@ -50,6 +55,7 @@ export const Header: React.FC = () => {
       setIsAuthed(false)
       setUserName(null)
       setUserEmail(null)
+      setUserRole(null)
       setAvatarUrl(null)
     }
   }
@@ -279,7 +285,23 @@ export const Header: React.FC = () => {
                           {userEmail}
                         </div>
                       )}
+                      {userRole && (
+                        <div className="text-xs font-semibold text-purple-600 mt-1">
+                          {userRole === 'ADMIN' ? '👨‍💼 Admin' : userRole}
+                        </div>
+                      )}
                     </div>
+                    {userRole === 'ADMIN' && (
+                      <>
+                        <Link
+                          href="/admin/dashboard"
+                          className="block px-3 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium"
+                        >
+                          📊 Admin Dashboard
+                        </Link>
+                        <div className="border-t border-gray-100"></div>
+                      </>
+                    )}
                     <Link
                       href="/profile"
                       className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
