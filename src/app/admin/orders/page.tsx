@@ -22,6 +22,9 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [exportingFormat, setExportingFormat] = useState<'pdf' | 'xlsx' | null>(
+    null
+  )
   const [selectedOrder, setSelectedOrder] = useState<DashboardOrder | null>(
     null
   )
@@ -72,6 +75,64 @@ export default function AdminOrdersPage() {
     if (!isAdmin) return
     fetchOrders(1)
   }, [isAdmin, statusFilter, typeFilter])
+
+  const handleExportOrders = async (format: 'pdf' | 'xlsx' = 'pdf') => {
+    setExportingFormat(format)
+    try {
+      // Download file as blob or get export URL
+      const result = await dashboardService.downloadOrdersFile(format)
+
+      if (typeof result === 'string') {
+        // Result is an export URL from the server (R2 CDN)
+        console.log('Export URL from server:', result)
+
+        // Fetch file from URL and convert to blob
+        const fileResponse = await fetch(result)
+        if (!fileResponse.ok) {
+          throw new Error(
+            `Failed to fetch file from URL: ${fileResponse.status}`
+          )
+        }
+
+        const blob = await fileResponse.blob()
+        const url = window.URL.createObjectURL(blob)
+
+        // Create temporary link and trigger download
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `orders-export-${new Date().toISOString().split('T')[0]}.${format === 'pdf' ? 'pdf' : 'xlsx'}`
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Clean up the blob URL
+        window.URL.revokeObjectURL(url)
+      } else {
+        // Result is a blob
+        const url = window.URL.createObjectURL(result)
+
+        // Create temporary link and trigger download
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `orders-export-${new Date().toISOString().split('T')[0]}.${format === 'pdf' ? 'pdf' : 'xlsx'}`
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Clean up the blob URL
+        window.URL.revokeObjectURL(url)
+      }
+
+      toast.success(`Orders exported to ${format.toUpperCase()} successfully!`)
+    } catch (err: any) {
+      console.error('Error exporting orders:', err)
+      toast.error(`Failed to export orders: ${err?.message || 'Unknown error'}`)
+    } finally {
+      setExportingFormat(null)
+    }
+  }
 
   if (guardLoading) {
     return (
@@ -146,10 +207,44 @@ export default function AdminOrdersPage() {
 
       {/* Orders Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-xl font-bold text-gray-900">
             Orders ({totalOrders} total)
           </h3>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => handleExportOrders('pdf')}
+              disabled={
+                loading || exportingFormat !== null || orders.length === 0
+              }
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              {exportingFormat === 'pdf' ? (
+                <>
+                  <span className="inline-block animate-spin">⟳</span>
+                  Exporting...
+                </>
+              ) : (
+                '📄 Export PDF'
+              )}
+            </Button>
+            <Button
+              onClick={() => handleExportOrders('xlsx')}
+              disabled={
+                loading || exportingFormat !== null || orders.length === 0
+              }
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              {exportingFormat === 'xlsx' ? (
+                <>
+                  <span className="inline-block animate-spin">⟳</span>
+                  Exporting...
+                </>
+              ) : (
+                '📊 Export Excel'
+              )}
+            </Button>
+          </div>
         </div>
 
         {loading ? (
