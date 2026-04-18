@@ -5,8 +5,8 @@ export interface DashboardOrder {
   id: string
   userId: string
   totalAmount: string
-  status: 'PAID' | 'PENDING' | 'FAILED' | 'CANCELLED'
-  type: 'REGULAR' | 'GROUP_BUY'
+  status: 'PAID' | 'PENDING' | 'CANCELLED'
+  type: 'STANDARD' | 'GROUP_BUY'
   groupBuyId?: number
   paymentMethod: string
   qrCode?: string
@@ -28,6 +28,11 @@ export interface DashboardOrdersResponse {
   page: number
   limit: number
   totalPages: number
+  revenue: {
+    gross: number
+    paid: number
+    page: number
+  }
   data: DashboardOrder[]
 }
 
@@ -80,6 +85,11 @@ export interface ExportResponse {
 export const dashboardService = {
   /**
    * Get all orders with full details (admin only)
+   *
+   * Revenue breakdown:
+   * - gross: Tổng doanh thu theo bộ lọc
+   * - paid: Doanh thu đã thanh toán thực tế
+   * - page: Doanh thu của riêng trang admin đang xem
    */
   getOrders(
     page: number = 1,

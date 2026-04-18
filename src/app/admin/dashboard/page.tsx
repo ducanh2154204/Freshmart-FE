@@ -4,15 +4,13 @@ import { useState, useEffect } from 'react'
 import { useAdminGuard } from '@/hooks/useAdminGuard'
 import { AdminLayout } from '@/components/AdminLayout'
 import { dashboardService } from '@/services/dashboard.service'
-import type { AccessStats, DashboardOrder } from '@/services/dashboard.service'
+import type { AccessStats } from '@/services/dashboard.service'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { toast } from 'react-toastify'
-import { parseApiResponse } from '@/lib/response-parser'
 
 export default function AdminDashboardPage() {
   const { isAdmin, loading: guardLoading } = useAdminGuard()
   const [stats, setStats] = useState<AccessStats | null>(null)
-  const [orders, setOrders] = useState<DashboardOrder[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -28,27 +26,6 @@ export default function AdminDashboardPage() {
         const statsData = (statsResponse as any)?.data || statsResponse
         console.log('Parsed stats data:', statsData)
         setStats(statsData as AccessStats)
-
-        // Fetch recent orders
-        const ordersResponse = await dashboardService.getOrders(1, 10)
-        console.log('Raw orders response:', ordersResponse)
-
-        // Parse response with intelligent structure detection
-        const parsed = parseApiResponse<DashboardOrder>(ordersResponse)
-        console.log('Orders parse result:', {
-          detected: parsed.debug.detectedStructure,
-          itemCount: parsed.items.length,
-          total: parsed.total,
-        })
-
-        if (parsed.hasError) {
-          throw new Error(
-            parsed.errorMessage || 'Failed to parse orders response'
-          )
-        }
-
-        console.log('Final orders:', parsed.items)
-        setOrders(parsed.items)
       } catch (err: any) {
         console.error('Error fetching dashboard data:', err)
         console.error('Error details:', {
@@ -143,88 +120,179 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Recent Orders */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-xl font-bold text-gray-900">Recent Orders</h3>
-          <p className="text-sm text-gray-600 mt-1">Last 10 orders</p>
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        {/* Access Trends Chart */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-6">
+            Access Trends
+          </h3>
+          <div className="space-y-4">
+            {/* Today */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Today</span>
+                <span className="text-lg font-bold text-blue-600">
+                  {stats?.accesses.today || 0}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(
+                      ((stats?.accesses.today || 0) /
+                        Math.max(
+                          stats?.accesses.today || 1,
+                          stats?.accesses.week || 1,
+                          stats?.accesses.month || 1
+                        )) *
+                        100,
+                      100
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* This Week */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  This Week
+                </span>
+                <span className="text-lg font-bold text-green-600">
+                  {stats?.accesses.week || 0}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(
+                      ((stats?.accesses.week || 0) /
+                        Math.max(
+                          stats?.accesses.today || 1,
+                          stats?.accesses.week || 1,
+                          stats?.accesses.month || 1
+                        )) *
+                        100,
+                      100
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* This Month */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  This Month
+                </span>
+                <span className="text-lg font-bold text-purple-600">
+                  {stats?.accesses.month || 0}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-purple-600 h-2 rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(
+                      ((stats?.accesses.month || 0) /
+                        Math.max(
+                          stats?.accesses.today || 1,
+                          stats?.accesses.week || 1,
+                          stats?.accesses.month || 1
+                        )) *
+                        100,
+                      100
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {orders.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">No orders yet</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Order ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Created
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {orders.map(order => (
-                  <tr
-                    key={order.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4 text-sm font-mono text-gray-600">
-                      {order.id.substring(0, 16)}...
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {order.user?.name || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-green-600">
-                      {parseFloat(order.totalAmount).toLocaleString('vi-VN')}đ
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          order.status === 'PAID'
-                            ? 'bg-green-100 text-green-700'
-                            : order.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          order.type === 'GROUP_BUY'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {order.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(order.createdAt).toLocaleDateString('vi-VN')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Live Users Breakdown */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-6">
+            Live Users Breakdown
+          </h3>
+          <div className="space-y-4">
+            {/* Total Users */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Total</p>
+                  <p className="text-2xl font-bold text-blue-700 mt-1">
+                    {stats?.liveUsers.total || 0}
+                  </p>
+                </div>
+                <div className="text-4xl">👥</div>
+              </div>
+            </div>
+
+            {/* Authenticated Users */}
+            <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">
+                    Authenticated
+                  </p>
+                  <p className="text-2xl font-bold text-green-700 mt-1">
+                    {stats?.liveUsers.authenticated || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.liveUsers.total
+                      ? (
+                          ((stats.liveUsers.authenticated || 0) /
+                            stats.liveUsers.total) *
+                          100
+                        ).toFixed(1)
+                      : 0}
+                    %
+                  </p>
+                </div>
+                <div className="text-4xl">✓</div>
+              </div>
+            </div>
+
+            {/* Guest Users */}
+            <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 font-medium">Guest</p>
+                  <p className="text-2xl font-bold text-orange-700 mt-1">
+                    {stats?.liveUsers.guest || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats?.liveUsers.total
+                      ? (
+                          ((stats.liveUsers.guest || 0) /
+                            stats.liveUsers.total) *
+                          100
+                        ).toFixed(1)
+                      : 0}
+                    %
+                  </p>
+                </div>
+                <div className="text-4xl">🔓</div>
+              </div>
+            </div>
+
+            {/* Active Window */}
+            <div className="border-t pt-4 mt-4">
+              <p className="text-xs text-gray-600">
+                Active in last{' '}
+                <span className="font-semibold text-gray-900">
+                  {stats?.liveUsers.liveWindowMinutes || 0} minutes
+                </span>
+              </p>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </AdminLayout>
   )
