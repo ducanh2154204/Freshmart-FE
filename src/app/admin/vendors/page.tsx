@@ -213,20 +213,39 @@ export default function AdminVendorsPage() {
               <div className="text-sm text-gray-600">
                 Page {page} of {totalPages}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1 items-center">
                 <Button
                   disabled={page <= 1}
                   onClick={() => fetchVendors(page - 1)}
-                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded font-medium disabled:opacity-50"
+                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded font-medium disabled:opacity-50"
                 >
-                  Previous
+                  ← Previous
                 </Button>
+
+                <div className="flex gap-1 mx-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    pageNum => (
+                      <button
+                        key={pageNum}
+                        onClick={() => fetchVendors(pageNum)}
+                        className={`px-3 py-2 text-sm rounded font-medium transition-colors ${
+                          pageNum === page
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  )}
+                </div>
+
                 <Button
                   disabled={page >= totalPages}
                   onClick={() => fetchVendors(page + 1)}
-                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded font-medium disabled:opacity-50"
+                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded font-medium disabled:opacity-50"
                 >
-                  Next
+                  Next →
                 </Button>
               </div>
             </div>

@@ -28,6 +28,11 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<DashboardOrder | null>(
     null
   )
+  const [revenue, setRevenue] = useState<{
+    gross: number
+    paid: number
+    page: number
+  }>({ gross: 0, paid: 0, page: 0 })
 
   const fetchOrders = async (p: number = 1) => {
     setLoading(true)
@@ -58,6 +63,10 @@ export default function AdminOrdersPage() {
       setOrders(parsed.items)
       setTotalOrders(parsed.total)
       setPage(p)
+      // Set revenue data if available
+      if ((response as any)?.revenue) {
+        setRevenue((response as any).revenue)
+      }
     } catch (err: any) {
       console.error('Error fetching orders:', err)
       console.error('Error details:', {
@@ -74,7 +83,7 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     if (!isAdmin) return
     fetchOrders(1)
-  }, [isAdmin, statusFilter, typeFilter])
+  }, [isAdmin, statusFilter, typeFilter, limit])
 
   const handleExportOrders = async (format: 'pdf' | 'xlsx' = 'pdf') => {
     setExportingFormat(format)
@@ -152,6 +161,37 @@ export default function AdminOrdersPage() {
 
   return (
     <AdminLayout>
+      {/* Revenue Statistics */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+            Doanh thu tổng
+          </p>
+          <p className="text-2xl font-bold text-gray-900 mt-2">
+            {revenue.gross.toLocaleString('vi-VN')}đ
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Theo bộ lọc</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+            Doanh thu đã thanh toán
+          </p>
+          <p className="text-2xl font-bold text-green-600 mt-2">
+            {revenue.paid.toLocaleString('vi-VN')}đ
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Thực tế</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+            Doanh thu trang
+          </p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">
+            {revenue.page.toLocaleString('vi-VN')}đ
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Đang xem</p>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="mb-6 bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
@@ -166,9 +206,8 @@ export default function AdminOrdersPage() {
               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm"
             >
               <option value="">All Status</option>
-              <option value="PAID">Paid</option>
               <option value="PENDING">Pending</option>
-              <option value="FAILED">Failed</option>
+              <option value="PAID">Paid</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
@@ -183,7 +222,7 @@ export default function AdminOrdersPage() {
               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm"
             >
               <option value="">All Types</option>
-              <option value="REGULAR">Regular</option>
+              <option value="STANDARD">Standard</option>
               <option value="GROUP_BUY">Group Buy</option>
             </select>
           </div>
@@ -199,7 +238,6 @@ export default function AdminOrdersPage() {
             >
               <option value="10">10</option>
               <option value="20">20</option>
-              <option value="50">50</option>
             </select>
           </div>
         </div>
@@ -309,7 +347,7 @@ export default function AdminOrdersPage() {
                               ? 'bg-green-100 text-green-700'
                               : order.status === 'PENDING'
                                 ? 'bg-yellow-100 text-yellow-700'
-                                : order.status === 'FAILED'
+                                : order.status === 'CANCELLED'
                                   ? 'bg-red-100 text-red-700'
                                   : 'bg-gray-100 text-gray-700'
                           }`}
@@ -350,20 +388,39 @@ export default function AdminOrdersPage() {
               <div className="text-sm text-gray-600">
                 Page {page} of {totalPages}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1 items-center">
                 <Button
                   disabled={page <= 1}
                   onClick={() => fetchOrders(page - 1)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded font-medium disabled:opacity-50"
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded font-medium disabled:opacity-50"
                 >
-                  Previous
+                  ← Previous
                 </Button>
+
+                <div className="flex gap-1 mx-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    pageNum => (
+                      <button
+                        key={pageNum}
+                        onClick={() => fetchOrders(pageNum)}
+                        className={`px-3 py-2 text-sm rounded font-medium transition-colors ${
+                          pageNum === page
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  )}
+                </div>
+
                 <Button
                   disabled={page >= totalPages}
                   onClick={() => fetchOrders(page + 1)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded font-medium disabled:opacity-50"
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded font-medium disabled:opacity-50"
                 >
-                  Next
+                  Next →
                 </Button>
               </div>
             </div>
